@@ -1,0 +1,58 @@
+# Query
+
+Research that can show its work. Query is a fresh application informed by aibyai;
+it does not depend on aibyai at runtime. This bootstrap supplies development tools,
+settings, and a model boundary. Investigation workflows come next.
+
+## Development
+
+Install [mise](https://mise.jdx.dev), then in a separate jj workspace:
+
+```sh
+mise trust
+mise install
+mise run setup
+mise run check
+```
+
+Python and uv versions are pinned in `mise.toml`; application and dev dependencies
+are locked in `uv.lock`. Use `mise run format` for formatting and `mise exec -- uv add`
+for dependency changes. Dependency installation needs network access; tests do not.
+CI runs the same lint and offline pytest tasks, with no provider credentials.
+
+Copy `.env.example` to `.env` only when configuring application/eval execution.
+`QUERY_DATABASE_URL` is required by application settings and has no implicit fallback.
+Tests need neither a database nor a `.env`. Provider keys are optional until used.
+
+## Tests and evals
+
+`mise run test` uses Pydantic AI test models and fake clients. Real model requests
+are disabled before collection, and pytest blocks network sockets (Unix sockets
+remain available for the async event loop). This includes local model servers.
+
+For an explicit connectivity and structured-output eval, select a backend and model
+in `.env`, then run `mise run eval:smoke`. This makes one logical model request;
+provider SDK transport retries may repeat HTTP attempts. It refuses CI execution.
+No eval is included in `check`. This smoke check is not a quality benchmark.
+
+Supported settings:
+
+| Backend | Required settings |
+| --- | --- |
+| `anthropic` | `QUERY_MODEL_BACKEND`, `QUERY_MODEL_NAME`, `QUERY_ANTHROPIC_API_KEY` |
+| `openai` | `QUERY_MODEL_BACKEND`, `QUERY_MODEL_NAME`, `QUERY_OPENAI_API_KEY` |
+| `local` | `QUERY_MODEL_BACKEND`, `QUERY_MODEL_NAME`, `QUERY_LOCAL_BASE_URL` |
+
+Local endpoints use the OpenAI-compatible chat API, for example
+`http://127.0.0.1:1234/v1` with LM Studio. Set the model name to the server's loaded
+model identifier; `QUERY_LOCAL_API_KEY` defaults to `local`. Hosted backends use their
+fixed official API URLs and ignore ambient SDK base-URL overrides. Structured-output and
+tool compatibility depends on the chosen server/model and must be evaluated.
+
+Use local evals for quick prompt and schema experiments. Use Anthropic and OpenAI
+for the final research-quality benchmark: a cheaper model is not a substitute for
+measuring the models that will perform the research and review. Keep quality evals
+separate from deterministic correctness tests.
+
+See [architecture decisions](docs/architecture.md) for scope and persistence choices
+and [local model candidates](docs/local-models.md) for the initial shortlist.
