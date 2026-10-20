@@ -2,7 +2,8 @@
 
 Research that can show its work. Query is a fresh application informed by aibyai;
 it does not depend on aibyai at runtime. This bootstrap supplies development tools,
-settings, and a model boundary. Investigation workflows come next.
+settings, a model boundary, and durable investigation contracts. Automated research
+and review workflows come next.
 
 ## Development
 
@@ -18,17 +19,38 @@ mise run check
 Python and uv versions are pinned in `mise.toml`; application and dev dependencies
 are locked in `uv.lock`. Use `mise run format` for formatting and `mise exec -- uv add`
 for dependency changes. Dependency installation needs network access; tests do not.
-CI runs the same lint and offline pytest tasks, with no provider credentials.
+CI runs the same lint and pytest tasks with no provider credentials, plus an isolated
+PostgreSQL 18 service for persistence tests.
 
 Copy `.env.example` to `.env` only when configuring application/eval execution.
 `QUERY_DATABASE_URL` is required by application settings and has no implicit fallback.
-Tests need neither a database nor a `.env`. Provider keys are optional until used.
+Unit tests need neither a database nor a `.env`. Provider keys are optional until used.
 
 ## Tests and evals
 
 `mise run test` uses Pydantic AI test models and fake clients. Real model requests
 are disabled before collection, and pytest blocks network sockets (Unix sockets
-remain available for the async event loop). This includes local model servers.
+remain available for the async event loop). This includes local model servers. PostgreSQL integration tests use psycopg/libpq
+against an explicitly configured loopback test database; they make no provider calls.
+
+## Persistence checks
+
+The PostgreSQL database name in `.env.example` is `query`. Create it yourself, then
+run `mise run db:migrate` to apply migrations using `QUERY_DATABASE_URL`. This task
+writes only to the explicitly configured database; never use aibyai production.
+
+For local integration tests, create a separate database named `query_test`:
+
+```sh
+createdb query_test
+QUERY_TEST_DATABASE_URL=postgresql://localhost/query_test mise run check
+```
+
+Each test migrates a fresh randomly named schema and drops only that schema afterward.
+The test harness rejects non-loopback hosts, other database names, and URL query
+parameters. Integration tests skip locally when the variable is absent; CI requires it.
+Unit tests and all model calls remain offline. See [persistence](docs/persistence.md)
+for lifecycle, versioning, and recovery guarantees.
 
 For an explicit connectivity and structured-output eval, select a backend and model
 in `.env`, then run `mise run eval:smoke`. This makes one logical model request;
