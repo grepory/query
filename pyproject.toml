@@ -1,0 +1,32 @@
+[project]
+name = "query-research"
+version = "0.1.0"
+description = "Evidence-bounded investigations with explicit stopping decisions"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+  "pydantic-ai-slim[anthropic,openai]",
+  "pydantic-settings",
+  "firecrawl-py",
+  "exa-py",
+]
+
+[dependency-groups]
+dev = ["pytest", "pytest-socket", "ruff"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/query"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-config --strict-markers --disable-socket --allow-unix-socket"
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

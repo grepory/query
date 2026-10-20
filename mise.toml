@@ -1,0 +1,31 @@
+[tools]
+python = "3.14.8"
+uv = "0.13.2"
+
+[env]
+UV_PYTHON = "3.14.8"
+UV_PYTHON_DOWNLOADS = "never"
+
+[tasks.setup]
+description = "Install locked project dependencies"
+run = "uv sync --locked"
+
+[tasks.lint]
+description = "Check Python lint and formatting"
+run = ["uv run --locked ruff check .", "uv run --locked ruff format --check ."]
+
+[tasks.format]
+description = "Format Python code"
+run = "uv run --locked ruff format ."
+
+[tasks.test]
+description = "Run deterministic offline tests"
+run = "uv run --locked pytest"
+
+[tasks.check]
+description = "Run all CI checks"
+depends = ["lint", "test"]
+
+[tasks."eval:smoke"]
+description = "Explicit real-model smoke eval; forbidden in CI"
+run = "uv run --locked python -m evals.smoke --allow-model-requests"
