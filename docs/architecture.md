@@ -10,10 +10,10 @@ needed. aibyai is a reference for behavior and selective ports, not a dependency
   OpenAI for hosted evals, OpenAI-compatible endpoints for local evals. SDK extras
   are limited to the providers used. No network I/O occurs during configuration.
 - **PostgreSQL:** retain a familiar transactional store for durable investigation
-  state. NOT-33 introduces SQLAlchemy/Alembic and migrations; bootstrap settings
-  require an explicit PostgreSQL URL but do not connect or create tables. Tests in
-  this milestone need no running database. Future database integration tests use
-  an isolated Query test database, never aibyai production.
+  state. SQLAlchemy Core stores typed checkpoints, versioned briefs, steps, and
+  events; Alembic owns schema changes. Typed JSONB payloads preserve the initial
+  contracts without adding a generic workflow framework. Database tests use an
+  isolated local Query test database and disposable schemas, never aibyai production.
 - **Exa search and Firecrawl retrieval:** SDK dependencies and optional keys are
   present; adapters, requests, budgets, and acquisition live in NOT-44 through
   NOT-46. Exa API product versions are not Python SDK version constraints.

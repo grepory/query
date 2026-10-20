@@ -29,3 +29,7 @@ depends = ["lint", "test"]
 [tasks."eval:smoke"]
 description = "Explicit real-model smoke eval; forbidden in CI"
 run = "uv run --locked python -m evals.smoke --allow-model-requests"
+
+[tasks."db:migrate"]
+description = "Apply Query migrations to explicit QUERY_DATABASE_URL"
+run = "uv run --locked alembic upgrade head"
