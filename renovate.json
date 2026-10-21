@@ -3,6 +3,8 @@
   "extends": ["config:recommended"],
   "branchPrefix": "renovate-action/",
   "automerge": false,
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 0,
   "lockFileMaintenance": {
     "enabled": true
   },
