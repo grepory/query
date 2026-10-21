@@ -12,6 +12,12 @@
       "matchManagers": ["mise"],
       "matchDepNames": ["python"],
       "enabled": false
+    },
+    {
+      "description": "Keep the project Python constraint aligned with the manually managed runtime.",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["requires-python"],
+      "enabled": false
     }
   ]
 }
