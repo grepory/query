@@ -2,7 +2,7 @@
 
 Research that can show its work. Query is a fresh application informed by aibyai;
 it does not depend on aibyai at runtime. This bootstrap supplies development tools,
-settings, a model boundary, and durable investigation contracts. Automated research
+settings, a model boundary, durable investigation contracts, and supplied-text evidence snapshots. Automated research
 and review workflows come next.
 
 ## Development
@@ -25,6 +25,52 @@ PostgreSQL 18 service for persistence tests.
 Copy `.env.example` to `.env` only when configuring application/eval execution.
 `QUERY_DATABASE_URL` is required by application settings and has no implicit fallback.
 Unit tests need neither a database nor a `.env`. Provider keys are optional until used.
+
+## Supplied-text evidence API
+
+After applying migrations to your explicit Query database, use the store API:
+
+```python
+from datetime import UTC, datetime
+
+from query.db import database_engine
+from query.evidence import CandidateSelection, FreezeSnapshot, IngestText
+from query.store import InvestigationStore
+
+store = InvestigationStore(database_engine(database_url))  # Explicit Query database URL.
+run = store.load(investigation_id)  # An investigation created with a Brief and Limits.
+observation = store.ingest_text(
+    run.id,
+    run.revision,
+    IngestText(
+        operation_key="supply-document-1",
+        document_key="document-1",
+        title="Supplied capacity announcement",
+        observed_at=datetime.now(UTC),
+        text="Exact supplied source text, including whitespace.\n",
+    ),
+)
+if observation.status == "accepted":
+    run = store.load(run.id)
+    evidence = store.freeze_snapshot(
+        run.id,
+        run.revision,
+        FreezeSnapshot(
+            operation_key="freeze-1",
+            candidates=(CandidateSelection(version_id=observation.version_id),),
+        ),
+    )
+    # Only a ready snapshot has usable included passages.
+    print(evidence.snapshot.status, evidence.snapshot.id)
+else:
+    print(observation.reason, observation.byte_count, observation.max_bytes)
+```
+
+Version IDs name immutable exact text. `load_source_version` resolves passages;
+`load_snapshot` reconstructs a manifest, saved versions, and frozen provenance.
+Oversized inputs and selections are recorded explicitly. See
+[persistence](docs/persistence.md#supplied-evidence) for limits, exclusions, retry
+identity, and lifecycle constraints. CLI ingestion belongs to NOT-35.
 
 ## Dependency updates
 
