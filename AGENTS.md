@@ -1,6 +1,7 @@
 # Development instructions
 
 - Use `jj` with colocated Git. Work in a separate jj workspace outside the default workspace; preserve unrelated changes. Use `codex/` bookmark names for new work.
+- Once the ticket is closed or the work session has ended, and its changes are confirmed merged to `main`, clean up that work's temporary jj workspace. Verify it contains no unmerged work or unrelated files that need preserving, run `jj workspace forget <name>` from another workspace, then remove its directory. Keep workspaces with pending or unmerged changes.
 - Keep the relevant Linear ticket updated as work progresses. Include its identifier and full URL in every PR description; use `Closes NOT-123` when the PR completes that ticket.
 - Use mise for tool versions and tasks. Run `mise run check` before submitting changes; commit dependency updates with `uv.lock`.
 - Keep architecture concrete. Avoid premature abstraction; extract shared behavior when repeated patterns emerge. Keep provider I/O separate from domain decisions.

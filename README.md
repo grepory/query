@@ -26,6 +26,29 @@ Copy `.env.example` to `.env` only when configuring application/eval execution.
 `QUERY_DATABASE_URL` is required by application settings and has no implicit fallback.
 Unit tests need neither a database nor a `.env`. Provider keys are optional until used.
 
+## Dependency updates
+
+The Renovate workflow runs every six hours and can also be started from Actions →
+Renovate → Run workflow after it is merged to `main`. It uses
+`renovatebot/github-action@v46.3.9` and only processes `grepory/query`.
+`renovate.json` enables recommended update PRs and weekly `uv.lock` maintenance;
+updates require review and are not automatically merged. Python tool upgrades are
+manual because `mise.toml`'s Python pin and `UV_PYTHON`, the project Python constraint,
+and Ruff's target version must stay aligned. Other mise tools and GitHub Actions
+are managed by Renovate.
+
+Before the first run, add a dedicated `RENOVATE_TOKEN` repository Actions secret in
+[GitHub settings](https://github.com/grepory/query/settings/secrets/actions).
+For this public repository, a classic personal access token needs `public_repo`
+and `workflow` scopes. The workflow scope lets Renovate update Actions files.
+Use a dedicated token rather than the workflow's `GITHUB_TOKEN` so dependency PRs
+can trigger CI normally. Rotate the secret before its token expires.
+See the [Renovate action documentation](https://github.com/renovatebot/github-action#token).
+
+After merging, run the workflow manually and check its log and Dependency Dashboard
+issue. Missing credentials produce an explicit setup error. No checkout is needed:
+Renovate fetches the repository and its configuration using its own token.
+
 ## Tests and evals
 
 `mise run test` uses Pydantic AI test models and fake clients. Real model requests
