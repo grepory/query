@@ -3,9 +3,24 @@
 from uuid import UUID, uuid4
 
 from sqlalchemy import insert, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection, Engine
 
 from query import db
+from query.evidence import (
+    EvidenceInput,
+    EvidenceSnapshot,
+    FreezeSnapshot,
+    IngestText,
+    LoadedSnapshot,
+    Passage,
+    SnapshotCandidate,
+    SourceVersion,
+    fingerprint,
+    ingest_identity,
+    passage_ranges,
+    select_passages,
+)
 from query.investigation import (
     ACTIVE,
     HOLDS,
@@ -242,6 +257,341 @@ class InvestigationStore:
                     "used_tokens": result.used_tokens,
                 },
             )
+
+    def ingest_text(
+        self, identifier: UUID, expected_revision: int, request: IngestText
+    ) -> EvidenceInput:
+        request = IngestText.model_validate(request.model_dump())
+        identity = ingest_identity(request)
+        digest = fingerprint(identity)
+        with self.engine.begin() as conn:
+            row, current = self._lock(conn, identifier, expected_revision)
+            existing = (
+                conn.execute(
+                    select(db.evidence_inputs).where(
+                        db.evidence_inputs.c.investigation_id == identifier,
+                        db.evidence_inputs.c.operation_key == request.operation_key,
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if existing is not None:
+                if (
+                    existing["request"] != identity
+                    or existing["fingerprint"] != digest
+                    or existing["brief_version"] != current.brief_version
+                ):
+                    raise ValueError("Operation key already belongs to different input")
+                observation = EvidenceInput.model_validate(existing["payload"])
+                if observation.version_id is not None:
+                    version = self._read_source_version(conn, observation.version_id)
+                    if version.text != request.text:
+                        raise ValueError("Content hash collision")
+                return observation
+            self._require_evidence_mutation(conn, identifier, current)
+            reason = (
+                "empty_document"
+                if not request.text
+                else "document_too_large"
+                if identity["byte_count"] > request.max_bytes
+                else None
+            )
+            version_id = None
+            if reason is None:
+                conn.execute(
+                    pg_insert(db.sources)
+                    .values(
+                        id=uuid4(),
+                        document_key=request.document_key,
+                        title=request.title,
+                        origin_url=request.origin_url,
+                    )
+                    .on_conflict_do_nothing(index_elements=[db.sources.c.document_key])
+                )
+                source = (
+                    conn.execute(
+                        select(db.sources)
+                        .where(db.sources.c.document_key == request.document_key)
+                        .with_for_update()
+                    )
+                    .mappings()
+                    .one()
+                )
+                if source["title"] != request.title or source["origin_url"] != request.origin_url:
+                    raise ValueError("Existing document key has different title or origin")
+                version = (
+                    conn.execute(
+                        select(db.source_versions).where(
+                            db.source_versions.c.source_id == source["id"],
+                            db.source_versions.c.content_hash == identity["content_hash"],
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if version is not None:
+                    if version["text"] != request.text:
+                        raise ValueError("Content hash collision")
+                    version_id = version["id"]
+                else:
+                    version_id = uuid4()
+                    conn.execute(
+                        insert(db.source_versions).values(
+                            id=version_id,
+                            source_id=source["id"],
+                            text=request.text,
+                            content_hash=identity["content_hash"],
+                            byte_count=identity["byte_count"],
+                            codepoint_count=identity["codepoint_count"],
+                            partition_version=1,
+                        )
+                    )
+                    conn.execute(
+                        insert(db.passages),
+                        [
+                            {"id": uuid4(), "version_id": version_id, "start": start, "end": end}
+                            for start, end in passage_ranges(request.text)
+                        ],
+                    )
+            observation = EvidenceInput(
+                investigation_id=identifier,
+                operation_key=request.operation_key,
+                brief_version=current.brief_version,
+                revision=row["revision"] + 1,
+                document_key=request.document_key,
+                title=request.title,
+                origin_url=request.origin_url,
+                observed_at=request.observed_at,
+                published_at=request.published_at,
+                content_hash=identity["content_hash"],
+                byte_count=identity["byte_count"],
+                codepoint_count=identity["codepoint_count"],
+                max_bytes=request.max_bytes,
+                status="accepted" if reason is None else "rejected",
+                version_id=version_id,
+                reason=reason,
+            )
+            conn.execute(
+                insert(db.evidence_inputs).values(
+                    investigation_id=identifier,
+                    operation_key=request.operation_key,
+                    brief_version=current.brief_version,
+                    fingerprint=digest,
+                    request=identity,
+                    payload=observation.model_dump(mode="json"),
+                    version_id=version_id,
+                    status=observation.status,
+                )
+            )
+            self._save(
+                conn,
+                row,
+                current,
+                "evidence_ingested",
+                {
+                    "operation_key": request.operation_key,
+                    "status": observation.status,
+                    "version_id": str(version_id) if version_id else None,
+                    "reason": reason,
+                },
+            )
+            return observation
+
+    def freeze_snapshot(
+        self, identifier: UUID, expected_revision: int, request: FreezeSnapshot
+    ) -> LoadedSnapshot:
+        request = FreezeSnapshot.model_validate(request.model_dump())
+        identity = request.model_dump(mode="json")
+        digest = fingerprint(identity)
+        with self.engine.begin() as conn:
+            row, current = self._lock(conn, identifier, expected_revision)
+            existing = (
+                conn.execute(
+                    select(db.evidence_snapshots).where(
+                        db.evidence_snapshots.c.investigation_id == identifier,
+                        db.evidence_snapshots.c.operation_key == request.operation_key,
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if existing is not None:
+                if (
+                    existing["request"] != identity
+                    or existing["fingerprint"] != digest
+                    or existing["brief_version"] != current.brief_version
+                ):
+                    raise ValueError("Operation key already belongs to a different snapshot")
+                return self._read_snapshot(conn, existing["id"])
+            self._require_evidence_mutation(conn, identifier, current)
+            observations = tuple(
+                EvidenceInput.model_validate(payload)
+                for payload in conn.execute(
+                    select(db.evidence_inputs.c.payload)
+                    .where(
+                        db.evidence_inputs.c.investigation_id == identifier,
+                    )
+                    .order_by(db.evidence_inputs.c.operation_key)
+                ).scalars()
+            )
+            candidates = []
+            requested_bytes = 0
+            for selection in request.candidates:
+                keys = tuple(
+                    o.operation_key for o in observations if o.version_id == selection.version_id
+                )
+                if not keys:
+                    raise ValueError("Candidate version was not acquired by this investigation")
+                version = self._read_source_version(conn, selection.version_id)
+                dispositions = select_passages(selection, version)
+                requested_bytes += sum(
+                    len(version.text[p.start : p.end].encode("utf-8"))
+                    for p in dispositions
+                    if p.included
+                )
+                candidates.append(
+                    SnapshotCandidate(
+                        version_id=version.id,
+                        observation_keys=keys,
+                        passages=dispositions,
+                    )
+                )
+            reason = (
+                "snapshot_too_large"
+                if requested_bytes > request.max_bytes
+                else "empty_selection"
+                if requested_bytes == 0
+                else None
+            )
+            if reason == "snapshot_too_large":
+                candidates = [
+                    c.model_copy(
+                        update={
+                            "passages": tuple(
+                                p.model_copy(update={"included": False, "reason": reason})
+                                if p.included
+                                else p
+                                for p in c.passages
+                            )
+                        }
+                    )
+                    for c in candidates
+                ]
+            snapshot = EvidenceSnapshot(
+                id=uuid4(),
+                investigation_id=identifier,
+                operation_key=request.operation_key,
+                brief_version=current.brief_version,
+                revision=row["revision"] + 1,
+                status="ready" if reason is None else "limited",
+                reason=reason,
+                candidates=tuple(candidates),
+                rejected_inputs=tuple(
+                    o
+                    for o in observations
+                    if o.status == "rejected" and o.brief_version == current.brief_version
+                ),
+                requested_bytes=requested_bytes,
+                included_bytes=requested_bytes if reason is None else 0,
+                max_bytes=request.max_bytes,
+            )
+            conn.execute(
+                insert(db.evidence_snapshots).values(
+                    id=snapshot.id,
+                    investigation_id=identifier,
+                    operation_key=request.operation_key,
+                    brief_version=current.brief_version,
+                    format_version=1,
+                    status=snapshot.status,
+                    fingerprint=digest,
+                    request=identity,
+                    manifest=snapshot.model_dump(mode="json"),
+                )
+            )
+            if candidates:
+                conn.execute(
+                    insert(db.snapshot_versions),
+                    [{"snapshot_id": snapshot.id, "version_id": c.version_id} for c in candidates],
+                )
+            self._save(
+                conn,
+                row,
+                current,
+                "snapshot_frozen",
+                {
+                    "snapshot_id": str(snapshot.id),
+                    "status": snapshot.status,
+                },
+            )
+            return self._read_snapshot(conn, snapshot.id)
+
+    def load_source_version(self, version_id: UUID) -> SourceVersion:
+        with self.engine.begin() as conn:
+            return self._read_source_version(conn, version_id)
+
+    def load_snapshot(self, snapshot_id: UUID) -> LoadedSnapshot:
+        with self.engine.begin() as conn:
+            return self._read_snapshot(conn, snapshot_id)
+
+    def _require_evidence_mutation(self, conn, identifier, current):
+        if current.phase not in {Phase.SCOPE, Phase.PLANNING, Phase.GATHERING, Phase.ASSESSING}:
+            raise ValueError("Evidence changes require an active research phase")
+        self._require_no_pending(conn, identifier)
+
+    @staticmethod
+    def _read_source_version(conn, version_id):
+        version = (
+            conn.execute(
+                select(
+                    db.source_versions,
+                    db.sources.c.document_key,
+                    db.sources.c.title,
+                    db.sources.c.origin_url,
+                )
+                .join(db.sources, db.source_versions.c.source_id == db.sources.c.id)
+                .where(db.source_versions.c.id == version_id)
+            )
+            .mappings()
+            .one_or_none()
+        )
+        if version is None:
+            raise KeyError(version_id)
+        passages = tuple(
+            Passage.model_validate(dict(p))
+            for p in conn.execute(
+                select(db.passages)
+                .where(db.passages.c.version_id == version_id)
+                .order_by(db.passages.c.start)
+            ).mappings()
+        )
+        return SourceVersion(**version, passages=passages)
+
+    def _read_snapshot(self, conn, snapshot_id):
+        payload = conn.execute(
+            select(db.evidence_snapshots.c.manifest).where(
+                db.evidence_snapshots.c.id == snapshot_id,
+            )
+        ).scalar_one_or_none()
+        if payload is None:
+            raise KeyError(snapshot_id)
+        snapshot = EvidenceSnapshot.model_validate(payload)
+        observations = []
+        versions = []
+        for candidate in snapshot.candidates:
+            versions.append(self._read_source_version(conn, candidate.version_id))
+            for key in candidate.observation_keys:
+                observation = conn.execute(
+                    select(db.evidence_inputs.c.payload).where(
+                        db.evidence_inputs.c.investigation_id == snapshot.investigation_id,
+                        db.evidence_inputs.c.operation_key == key,
+                        db.evidence_inputs.c.version_id == candidate.version_id,
+                    )
+                ).scalar_one()
+                observations.append(EvidenceInput.model_validate(observation))
+        return LoadedSnapshot(
+            snapshot=snapshot, versions=tuple(versions), observations=tuple(observations)
+        )
 
     @staticmethod
     def _lock(conn: Connection, identifier: UUID, expected: int | None = None, *, read=False):

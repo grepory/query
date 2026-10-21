@@ -2,7 +2,8 @@
 
 `InvestigationStore` uses SQLAlchemy Core and PostgreSQL. The store makes no model
 calls. Briefs and checkpoints use validated Pydantic contracts; Alembic creates
-four tables: investigations, brief_versions, steps, and investigation_events.
+the lifecycle tables: investigations, brief_versions, steps, and investigation_events,
+plus the supplied-evidence tables described below.
 
 ## Versioning and transitions
 
@@ -68,3 +69,52 @@ lifecycle validation and are not a supported application interface.
 Tests apply the actual migration to disposable PostgreSQL schemas, compare metadata,
 and exercise downgrade/upgrade, racing writers, stale decisions, budget overruns,
 rollback, and recovery. SQLite is not substituted for PostgreSQL locking behavior.
+
+## Supplied evidence
+
+`IngestText` accepts supplied Unicode text and explicit provenance. `ingest_text`
+returns an `EvidenceInput` with the committed revision and accepted version ID or
+rejection reason. Reload the investigation before the next mutation. The default
+per-document limit is 1 MiB of UTF-8. Empty or oversized text commits a rejection
+with its hash, counts, metadata, and limit; it never saves partial text. NUL,
+unpaired surrogates, invalid metadata, and naive timestamps fail before mutation.
+
+Document keys are exact, case-sensitive identities shared across investigations.
+The same key must retain its title and origin URL. Within that identity, exact
+UTF-8 hashes deduplicate versions, including A → B → A. Each import records its own
+observation timestamps. Text preserves whitespace, CRLF and Unicode normalization.
+Passages partition the entire accepted text in slices of at most 2,000 Unicode
+code points, using end-exclusive offsets. `SourceVersion.passage_text` resolves a
+passage only against its named version.
+
+`FreezeSnapshot` names an explicit ordered corpus of candidate versions already
+acquired by the investigation. A `CandidateSelection` with `passage_ids=None`
+includes all its passages. Partial or empty selections require an exclusion reason.
+The snapshot saves each selected or excluded passage and freezes its provenance
+observation keys; subsequent imports cannot expand those references. Current-brief
+rejected inputs are copied into the manifest. Earlier versions and observations
+remain available after brief revisions. The candidate list defines corpus scope;
+it does not assert that every historical document has been considered.
+
+The default selected-text limit is 256 KiB of UTF-8, independently of token budgets.
+Oversized selections commit a `limited` snapshot with no included passages and
+explicit `snapshot_too_large` exclusions. Empty selections are also `limited`.
+Explicitly select fewer passages or increase the limit under a new operation key.
+A nonempty selection within the limit is `ready`; this does not attest to research
+sufficiency, source truth, or answer integrity. `load_snapshot` returns the manifest,
+exact source versions, and only the frozen accepted observations.
+
+Evidence mutations use the existing investigation lock, expected revision, pending
+step guard, and atomic revision/event transaction. New evidence is allowed in scope,
+planning, gathering, or assessing. It cannot be added while reviewing, held, complete,
+or canceled. An exact operation-key retry after reloading returns the original
+result without a revision/event change; a changed request or brief is rejected.
+Global source row locks serialize version creation across investigations. No token
+usage, checkpoint phase, current-snapshot pointer, or existing evidence is changed.
+
+Migration `0002` adds sources, source_versions, passages, evidence_inputs,
+evidence_snapshots, and snapshot_versions. These records are append-only through
+the application API. Typed JSONB manifests carry ordered references and exclusions;
+foreign keys enforce the source/version/brief identities. As elsewhere in this store,
+direct SQL updates are outside the supported interface. No database-specific
+application role or immutable-row trigger is introduced.
