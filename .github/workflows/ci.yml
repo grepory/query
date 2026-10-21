@@ -21,6 +21,6 @@ jobs:
       QUERY_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/query_test
     steps:
       - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v3
+      - uses: jdx/mise-action@v5
       - run: mise run setup
       - run: mise run check
