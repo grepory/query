@@ -2,7 +2,7 @@
 name = "query-research"
 version = "0.1.0"
 description = "Evidence-bounded investigations with explicit stopping decisions"
-requires-python = ">=3.14,<3.15"
+requires-python = ">=3.15,<3.16"
 dependencies = [
   "pydantic-ai-slim[anthropic,openai]",
   "pydantic-settings",
