@@ -32,7 +32,9 @@ The Renovate workflow runs every six hours and can also be started from Actions 
 Renovate → Run workflow after it is merged to `main`. It uses
 `renovatebot/github-action@v46.3.9` and only processes `grepory/query`.
 `renovate.json` enables recommended update PRs and weekly `uv.lock` maintenance;
-updates require review and are not automatically merged. Python tool upgrades are
+Renovate opens at most five PRs at a time, with no hourly creation limit so merged
+updates immediately free slots for the next run. Updates require review and are
+not automatically merged. Python tool upgrades are
 manual because `mise.toml`'s Python pin and `UV_PYTHON`, the project Python constraint,
 and Ruff's target version must stay aligned. Other mise tools and GitHub Actions
 are managed by Renovate.
