@@ -1,0 +1,13 @@
+{
+  "key": "fixture-answer-1",
+  "lane": "review",
+  "reserved_tokens": 20,
+  "result": {
+    "status": "succeeded",
+    "used_tokens": 10,
+    "output": {
+      "answer": "Synthetic fixture: Aster reports 900 MW operational as of 1 October 2026; 1200 MW is planned.",
+      "decision": "Fixture only: no model review or research-sufficiency assessment has occurred."
+    }
+  }
+}

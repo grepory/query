@@ -13,6 +13,9 @@ dependencies = [
   "psycopg[binary]>=3,<4",
 ]
 
+[project.scripts]
+query = "query.cli:main"
+
 [dependency-groups]
 dev = ["pytest", "pytest-socket", "ruff"]
 

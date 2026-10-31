@@ -21,6 +21,7 @@ from query.evidence import (
     passage_ranges,
     select_passages,
 )
+from query.export import InvestigationExport
 from query.investigation import (
     ACTIVE,
     HOLDS,
@@ -82,6 +83,36 @@ class InvestigationStore:
         with self.engine.begin() as conn:
             self._lock(conn, identifier, read=True)
             return self._read(conn, identifier)
+
+    def export(self, identifier: UUID) -> InvestigationExport:
+        """Read lifecycle, decisions and exact evidence under one shared row lock."""
+        with self.engine.begin() as conn:
+            self._lock(conn, identifier, read=True)
+            observations = tuple(
+                EvidenceInput.model_validate(payload)
+                for payload in conn.execute(
+                    select(db.evidence_inputs.c.payload)
+                    .where(db.evidence_inputs.c.investigation_id == identifier)
+                    .order_by(db.evidence_inputs.c.operation_key)
+                ).scalars()
+            )
+            version_ids = sorted(
+                {o.version_id for o in observations if o.version_id is not None}, key=str
+            )
+            snapshots = tuple(
+                EvidenceSnapshot.model_validate(payload)
+                for payload in conn.execute(
+                    select(db.evidence_snapshots.c.manifest)
+                    .where(db.evidence_snapshots.c.investigation_id == identifier)
+                    .order_by(db.evidence_snapshots.c.manifest["revision"].as_integer())
+                ).scalars()
+            )
+            return InvestigationExport(
+                investigation=self._read(conn, identifier),
+                evidence_inputs=observations,
+                source_versions=tuple(self._read_source_version(conn, v) for v in version_ids),
+                snapshots=snapshots,
+            )
 
     def revise_brief(self, identifier: UUID, expected_revision: int, brief: Brief) -> Investigation:
         with self.engine.begin() as conn:
