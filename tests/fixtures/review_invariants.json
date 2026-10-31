@@ -1,0 +1,3156 @@
+{
+  "source_repository": "https://github.com/grepory/aibyai",
+  "source_revision": "ce28ff41013e30e5b4a47ba8d9f15a50f48ea8c9",
+  "brief": {
+    "question": "What capacity is operational at Aster?",
+    "scope": "Only supplied synthetic documents; no web acquisition.",
+    "cutoff": "2026-10-01",
+    "questions": [
+      {
+        "key": "operational",
+        "text": "How much capacity is operational?",
+        "acceptance_criteria": "Distinguish operational from planned capacity and identify date.",
+        "required": true
+      }
+    ]
+  },
+  "versions": {
+    "v1": "As of 1 October 2026, Aster operates 900 MW. Expansion to 1200 MW is planned.",
+    "v2": "Boreal operates 200 MW.",
+    "v3": "Aster has signed a private lease for another 300 MW.",
+    "v4": "As of 2 October 2026, Aster operates 1200 MW."
+  },
+  "snapshots": {
+    "s1": [
+      "v1",
+      "v2"
+    ],
+    "s2": [
+      "v2",
+      "v4"
+    ]
+  },
+  "cases": [
+    {
+      "id": "review-pending-revision",
+      "area": "final_review",
+      "owners": [
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_the_stored_post_was_always_reviewed"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "review:d2"
+        ],
+        "forbidden": [
+          "export:d2",
+          "author:rewrite-d2"
+        ],
+        "visible_draft": "d1",
+        "rationale": "The latest revision has no review; the previous reviewed draft remains the visible answer."
+      }
+    },
+    {
+      "id": "upheld-still-final-review",
+      "area": "final_review",
+      "owners": [
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_authoring_resume.py",
+          "symbol": "test_a_round_with_nothing_to_change_still_gets_a_final_review"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i2",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The author defense still misreads this quantity.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "save:unchanged-d3",
+          "review:d3"
+        ],
+        "forbidden": [
+          "settle:without-final-review",
+          "author:rewrite-d2",
+          "adjudicate:i2"
+        ],
+        "visible_draft": "d2",
+        "rationale": "Upholding the repeated dispute removes a blocker but still requires a full final review."
+      },
+      "responses": [
+        {
+          "draft": "d2",
+          "issue": "i1",
+          "disposition": "defend",
+          "explanation": "The dated saved passage supports this scope.",
+          "evidence": [
+            {
+              "version": "v1",
+              "excerpt": "Aster operates 900 MW."
+            }
+          ],
+          "applied_edit": null
+        }
+      ],
+      "rulings": [
+        {
+          "id": "a1",
+          "issue": "i2",
+          "snapshot": "s1",
+          "claim": "capacity",
+          "claim_text": "Aster operates 900 MW.",
+          "decision": "supported",
+          "rationale": "The saved operational passage decides this claim.",
+          "replacement": null
+        }
+      ]
+    },
+    {
+      "id": "final-review-unaffordable",
+      "area": "final_review",
+      "owners": [
+        "NOT-40"
+      ],
+      "origins": [
+        {
+          "path": "src/services/authoring.py",
+          "symbol": "_exhausted"
+        },
+        {
+          "path": "tests/test_authoring_report.py",
+          "symbol": "test_an_unreviewed_draft_counts_after_every_round"
+        }
+      ],
+      "changed_assumptions": "Source always reviews a paid revision even over allowance. Query checks call admission in advance and parks if reserved final-review capacity cannot fit.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 100,
+          "review": 40,
+          "total": 140
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "park:final-review-unaffordable"
+        ],
+        "forbidden": [
+          "review:d2",
+          "export:d2",
+          "complete:investigation"
+        ],
+        "visible_draft": "d1",
+        "rationale": "Query cannot admit a review with no allowance; retain d1, preserve pending d2, and require an explicit grant."
+      }
+    },
+    {
+      "id": "issue-specific-defense",
+      "area": "responses",
+      "owners": [
+        "NOT-37",
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_reviewer_can_withdraw_after_an_issue_specific_defense"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "review:d2-with-defense-i1"
+        ],
+        "forbidden": [
+          "adjudicate:i1",
+          "discard:defense"
+        ],
+        "visible_draft": "d1",
+        "rationale": "A defense is paired to its issue and source passage; allow the reviewer to withdraw before adjudication."
+      },
+      "responses": [
+        {
+          "draft": "d2",
+          "issue": "i1",
+          "disposition": "defend",
+          "explanation": "The dated saved passage supports this scope.",
+          "evidence": [
+            {
+              "version": "v1",
+              "excerpt": "Aster operates 900 MW."
+            }
+          ],
+          "applied_edit": null
+        }
+      ]
+    },
+    {
+      "id": "concession-saved",
+      "area": "responses",
+      "owners": [
+        "NOT-37",
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_author_concession_and_targeted_revision_are_persisted"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 1200 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "review:d2-with-concession-i1"
+        ],
+        "forbidden": [
+          "discard:applied-edit",
+          "settle:without-final-review"
+        ],
+        "visible_draft": "d1",
+        "rationale": "The concession and exact edit remain in history; editing alone is not approval."
+      },
+      "responses": [
+        {
+          "draft": "d2",
+          "issue": "i1",
+          "disposition": "concede",
+          "explanation": "Use the dated operational figure.",
+          "evidence": [],
+          "applied_edit": "Replace 1200 MW with 900 MW."
+        }
+      ]
+    },
+    {
+      "id": "free-form-is-not-evidence",
+      "area": "responses",
+      "owners": [
+        "NOT-37",
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "src/services/authoring.py",
+          "symbol": "_author_response"
+        }
+      ],
+      "changed_assumptions": "Source preserves free-form fallback with disposition unstructured and no evidence; Query must not silently promote it to a structured defense.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "review:d2-with-unstructured-response"
+        ],
+        "forbidden": [
+          "treat:free-form-as-verified-defense"
+        ],
+        "visible_draft": "d1",
+        "rationale": "Retain free-form explanation without fabricating issue-specific evidence."
+      },
+      "responses": [
+        {
+          "draft": "d2",
+          "issue": "i1",
+          "disposition": "unstructured",
+          "explanation": "Use the dated operational figure.",
+          "evidence": [],
+          "applied_edit": null
+        }
+      ]
+    },
+    {
+      "id": "reworded-objection-escalates",
+      "area": "disputes",
+      "owners": [
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_a_reworded_objection_to_the_same_claim_still_escalates"
+        }
+      ],
+      "changed_assumptions": "Source claim_key normalizes quoted text. Query uses explicit scoped identity; objection prose is not identity.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i2",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The author defense still misreads this quantity.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "adjudicate:i2"
+        ],
+        "forbidden": [
+          "author:repeat-defense-i2"
+        ],
+        "visible_draft": "d2",
+        "rationale": "The objection wording changed, but the claim and snapshot did not; this is a repeated dispute."
+      },
+      "responses": [
+        {
+          "draft": "d2",
+          "issue": "i1",
+          "disposition": "defend",
+          "explanation": "The dated saved passage supports this scope.",
+          "evidence": [
+            {
+              "version": "v1",
+              "excerpt": "Aster operates 900 MW."
+            }
+          ],
+          "applied_edit": null
+        }
+      ]
+    },
+    {
+      "id": "fresh-and-repeated-issues",
+      "area": "disputes",
+      "owners": [
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_new_objections_reach_the_author_in_a_round_that_adjudicates"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            },
+            {
+              "id": "expansion",
+              "text": "The planned expansion is already operational.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i2",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            },
+            {
+              "id": "i3",
+              "claim": "expansion",
+              "kind": "inference",
+              "problem": "A plan does not imply completed operation.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "adjudicate:i2",
+          "revise:ruling-and-fresh-i3"
+        ],
+        "forbidden": [
+          "adjudicate:i3",
+          "drop:fresh-i3"
+        ],
+        "visible_draft": "d2",
+        "rationale": "The repeated capacity dispute escalates; the new inference objection reaches the author in the same revision."
+      },
+      "responses": [
+        {
+          "draft": "d2",
+          "issue": "i1",
+          "disposition": "defend",
+          "explanation": "The dated saved passage supports this scope.",
+          "evidence": [
+            {
+              "version": "v1",
+              "excerpt": "Aster operates 900 MW."
+            }
+          ],
+          "applied_edit": null
+        }
+      ]
+    },
+    {
+      "id": "fresh-claim-not-a-stall",
+      "area": "disputes",
+      "owners": [
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_a_moving_argument_is_not_a_stall"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            },
+            {
+              "id": "expansion",
+              "text": "The expansion is operational.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i2",
+              "claim": "expansion",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "revise:fresh-i2"
+        ],
+        "forbidden": [
+          "adjudicate:i2",
+          "stop:round-count"
+        ],
+        "visible_draft": "d2",
+        "rationale": "A different claim gets its first response; round count alone is not a stall."
+      }
+    },
+    {
+      "id": "binding-narrow-reapplied",
+      "area": "rulings",
+      "owners": [
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_adjudicator_narrowing_or_removal_is_applied_then_finally_approved"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d3",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ],
+          "after_rulings": [
+            "a1"
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i2",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The author defense still misreads this quantity.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r3",
+          "draft": "d3",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i3",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The same claim remains under another objection wording.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "revise:apply-standing-ruling",
+          "review:edited-draft"
+        ],
+        "forbidden": [
+          "adjudicate:i2",
+          "settle:ignored-ruling",
+          "adjudicate:i3"
+        ],
+        "visible_draft": "d3",
+        "rationale": "The standing ruling is binding. Reapply the missed edit and review the resulting full answer."
+      },
+      "responses": [
+        {
+          "draft": "d2",
+          "issue": "i1",
+          "disposition": "defend",
+          "explanation": "The dated saved passage supports this scope.",
+          "evidence": [
+            {
+              "version": "v1",
+              "excerpt": "Aster operates 900 MW."
+            }
+          ],
+          "applied_edit": null
+        },
+        {
+          "draft": "d3",
+          "issue": "i2",
+          "disposition": "applied_ruling",
+          "explanation": "Use the dated operational figure.",
+          "evidence": [],
+          "applied_edit": "Claim left unchanged despite the standing ruling."
+        }
+      ],
+      "rulings": [
+        {
+          "id": "a1",
+          "issue": "i2",
+          "snapshot": "s1",
+          "claim": "capacity",
+          "claim_text": "Aster operates 900 MW.",
+          "decision": "narrow",
+          "rationale": "The saved operational passage decides this claim.",
+          "replacement": "Aster reported 900 MW operational as of 1 October 2026."
+        }
+      ]
+    },
+    {
+      "id": "binding-remove-reapplied",
+      "area": "rulings",
+      "owners": [
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_a_ruling_the_author_missed_is_reapplied_not_readjudicated"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d3",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ],
+          "after_rulings": [
+            "a1"
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i2",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The author defense still misreads this quantity.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r3",
+          "draft": "d3",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i3",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The same claim remains under another objection wording.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "revise:apply-standing-ruling",
+          "review:edited-draft"
+        ],
+        "forbidden": [
+          "adjudicate:i2",
+          "settle:ignored-ruling",
+          "adjudicate:i3"
+        ],
+        "visible_draft": "d3",
+        "rationale": "The standing ruling is binding. Reapply the missed edit and review the resulting full answer."
+      },
+      "responses": [
+        {
+          "draft": "d2",
+          "issue": "i1",
+          "disposition": "defend",
+          "explanation": "The dated saved passage supports this scope.",
+          "evidence": [
+            {
+              "version": "v1",
+              "excerpt": "Aster operates 900 MW."
+            }
+          ],
+          "applied_edit": null
+        },
+        {
+          "draft": "d3",
+          "issue": "i2",
+          "disposition": "applied_ruling",
+          "explanation": "Use the dated operational figure.",
+          "evidence": [],
+          "applied_edit": "Claim left unchanged despite the standing ruling."
+        }
+      ],
+      "rulings": [
+        {
+          "id": "a1",
+          "issue": "i2",
+          "snapshot": "s1",
+          "claim": "capacity",
+          "claim_text": "Aster operates 900 MW.",
+          "decision": "remove",
+          "rationale": "The saved operational passage decides this claim.",
+          "replacement": null
+        }
+      ]
+    },
+    {
+      "id": "upheld-same-scope",
+      "area": "rulings",
+      "owners": [
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_an_upheld_claim_is_not_relitigated_under_new_wording"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d3",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ],
+          "after_rulings": [
+            "a1"
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i2",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The author defense still misreads this quantity.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r3",
+          "draft": "d3",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i3",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The same claim remains under another objection wording.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "settle:answer-loop"
+        ],
+        "forbidden": [
+          "adjudicate:i2",
+          "adjudicate:i3",
+          "author:rewrite-d3"
+        ],
+        "visible_draft": "d3",
+        "rationale": "A differently worded objection to an unchanged upheld claim in s1 cannot trigger another ruling."
+      },
+      "responses": [
+        {
+          "draft": "d2",
+          "issue": "i1",
+          "disposition": "defend",
+          "explanation": "The dated saved passage supports this scope.",
+          "evidence": [
+            {
+              "version": "v1",
+              "excerpt": "Aster operates 900 MW."
+            }
+          ],
+          "applied_edit": null
+        }
+      ],
+      "rulings": [
+        {
+          "id": "a1",
+          "issue": "i2",
+          "snapshot": "s1",
+          "claim": "capacity",
+          "claim_text": "Aster operates 900 MW.",
+          "decision": "supported",
+          "rationale": "The saved operational passage decides this claim.",
+          "replacement": null
+        }
+      ]
+    },
+    {
+      "id": "new-snapshot-reopens-ruling",
+      "area": "rulings",
+      "owners": [
+        "NOT-39",
+        "NOT-47"
+      ],
+      "origins": [
+        {
+          "path": "src/services/authoring_state.py",
+          "symbol": "load_state"
+        }
+      ],
+      "changed_assumptions": "Source upheld keys are run-wide. Query scopes rulings and integrity checks to snapshot plus exact claim; new snapshot invalidates applicability.",
+      "snapshot": "s2",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d3",
+          "snapshot": "s2",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i2",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The author defense still misreads this quantity.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "review:d3-under-s2"
+        ],
+        "forbidden": [
+          "suppress:objection-with-s1-ruling",
+          "export:d3"
+        ],
+        "visible_draft": "d2",
+        "rationale": "Changed evidence requires a new review cycle; s1 rulings remain historical only."
+      },
+      "rulings": [
+        {
+          "id": "a1",
+          "issue": "i2",
+          "snapshot": "s1",
+          "claim": "capacity",
+          "claim_text": "Aster operates 900 MW.",
+          "decision": "supported",
+          "rationale": "The saved operational passage decides this claim.",
+          "replacement": null
+        }
+      ]
+    },
+    {
+      "id": "changed-claim-reopens-ruling",
+      "area": "rulings",
+      "owners": [
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "src/services/authoring_state.py",
+          "symbol": "claim_key"
+        }
+      ],
+      "changed_assumptions": "Identity includes claim text and scope, not just a stable ID. Conservative matching never treats semantic rewording as proof of equivalence.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d3",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 1200 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i2",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The author defense still misreads this quantity.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "review:changed-claim-d3"
+        ],
+        "forbidden": [
+          "suppress:objection-by-reused-claim-id"
+        ],
+        "visible_draft": "d2",
+        "rationale": "Even a reused ID cannot carry support to a changed quantity or scope."
+      },
+      "rulings": [
+        {
+          "id": "a1",
+          "issue": "i2",
+          "snapshot": "s1",
+          "claim": "capacity",
+          "claim_text": "Aster operates 900 MW.",
+          "decision": "supported",
+          "rationale": "The saved operational passage decides this claim.",
+          "replacement": null
+        }
+      ]
+    },
+    {
+      "id": "editorial-only-rejection",
+      "area": "editorial",
+      "owners": [
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_an_editorial_objection_cannot_cost_a_round"
+        },
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_editorial_notes_ship_with_the_post"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "editorial",
+              "problem": "Prefer a shorter opening.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "settle:answer-loop",
+          "record:editorial-note"
+        ],
+        "forbidden": [
+          "author:editorial-round",
+          "request:research",
+          "complete:without-sufficiency"
+        ],
+        "visible_draft": "d1",
+        "rationale": "Reviewer publishable=false with only style feedback cannot force another round; settlement still needs separate completion checks."
+      }
+    },
+    {
+      "id": "signoff-with-factual-blocker",
+      "area": "editorial",
+      "owners": [
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_a_factual_objection_overrules_the_reviewers_own_sign_off"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": true,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "revise:factual-i1"
+        ],
+        "forbidden": [
+          "settle:answer-loop"
+        ],
+        "visible_draft": "d1",
+        "rationale": "Reviewer publishable=true does not erase its factual objection."
+      }
+    },
+    {
+      "id": "wrong-source-real-quote",
+      "area": "evidence",
+      "owners": [
+        "NOT-38"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_excerpts_are_checked_against_the_corpus"
+        },
+        {
+          "path": "src/services/evidence.py",
+          "symbol": "verify"
+        }
+      ],
+      "changed_assumptions": "Source ignores evidence source labels. Query must bind the quote to its named immutable source version and selected passage.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": [
+                {
+                  "version": "v2",
+                  "excerpt": "Aster operates 900 MW."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "reject:citation-v2"
+        ],
+        "forbidden": [
+          "verify:by-any-corpus-match"
+        ],
+        "visible_draft": "d1",
+        "rationale": "The quote exists in v1 but not the cited v2; matching anywhere in the corpus is insufficient."
+      }
+    },
+    {
+      "id": "excluded-source-real-quote",
+      "area": "evidence",
+      "owners": [
+        "NOT-38"
+      ],
+      "origins": [
+        {
+          "path": "src/services/evidence.py",
+          "symbol": "verify"
+        }
+      ],
+      "changed_assumptions": "Source searches its corpus blocks; Query checks immutable selected membership, including explicit exclusions.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": [
+                {
+                  "version": "v3",
+                  "excerpt": "Aster has signed a private lease for another 300 MW."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "reject:excluded-v3"
+        ],
+        "forbidden": [
+          "verify:outside-selected-snapshot"
+        ],
+        "visible_draft": "d1",
+        "rationale": "A real saved quote in excluded v3 is not evidence in s1."
+      }
+    },
+    {
+      "id": "fabricated-excerpt",
+      "area": "evidence",
+      "owners": [
+        "NOT-38"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_excerpts_are_checked_against_the_corpus"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": [
+                {
+                  "version": "v1",
+                  "excerpt": "Aster operates 1700 MW on Mars."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "mark:excerpt-unverified"
+        ],
+        "forbidden": [
+          "use:fabricated-evidence-in-ruling"
+        ],
+        "visible_draft": "d1",
+        "rationale": "A fabricated quote is retained as an unsuccessful model assertion and cannot become ruling evidence."
+      }
+    },
+    {
+      "id": "ordered-normalized-quote",
+      "area": "evidence",
+      "owners": [
+        "NOT-38"
+      ],
+      "origins": [
+        {
+          "path": "src/services/evidence.py",
+          "symbol": "normalize"
+        },
+        {
+          "path": "src/services/evidence.py",
+          "symbol": "verify"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": [
+                {
+                  "version": "v1",
+                  "excerpt": "  ASTER   operates 900 MW. "
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "verify:normalized-ordered-v1-quote"
+        ],
+        "forbidden": [
+          "reject:case-or-whitespace-only"
+        ],
+        "visible_draft": "d1",
+        "rationale": "Case, whitespace and typographic quotes can normalize without changing source identity."
+      }
+    },
+    {
+      "id": "reversed-elision-rejected",
+      "area": "evidence",
+      "owners": [
+        "NOT-38"
+      ],
+      "origins": [
+        {
+          "path": "src/services/evidence.py",
+          "symbol": "verify"
+        }
+      ],
+      "changed_assumptions": "Source accepts any order of fragments within one block. Query must not accept fabricated joins that reverse source order.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": [
+                {
+                  "version": "v1",
+                  "excerpt": "Expansion to 1200 MW is planned. ... Aster operates 900 MW."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "reject:reversed-elision"
+        ],
+        "forbidden": [
+          "verify:unordered-fragments"
+        ],
+        "visible_draft": "d1",
+        "rationale": "Both fragments occur in v1, but the quote reverses their source order."
+      }
+    },
+    {
+      "id": "cross-source-elision-rejected",
+      "area": "evidence",
+      "owners": [
+        "NOT-38"
+      ],
+      "origins": [
+        {
+          "path": "src/services/evidence.py",
+          "symbol": "verify"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": [
+                {
+                  "version": "v1",
+                  "excerpt": "Aster operates 900 MW. ... Boreal operates 200 MW."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "reject:cross-source-join"
+        ],
+        "forbidden": [
+          "verify:fragments-across-versions"
+        ],
+        "visible_draft": "d1",
+        "rationale": "No one source version contains the claimed joined quote."
+      }
+    },
+    {
+      "id": "adjudicator-gets-independent-passages",
+      "area": "evidence",
+      "owners": [
+        "NOT-37",
+        "NOT-38",
+        "NOT-39"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_the_adjudicator_reads_source_neither_party_quoted"
+        },
+        {
+          "path": "src/services/evidence.py",
+          "symbol": "relevant"
+        }
+      ],
+      "changed_assumptions": "Source caps relevant blocks at four without omission metadata. Query records selected passages and packet omissions; missing context can request evidence.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i2",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The author defense still misreads this quantity.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "adjudicate:i2-with-v1-and-visible-omissions"
+        ],
+        "forbidden": [
+          "rule:from-party-excerpts-alone",
+          "hide:packet-truncation"
+        ],
+        "visible_draft": "d2",
+        "rationale": "The adjudicator sees saved relevant passages beyond party-selected excerpts, with explicit omissions if capped."
+      },
+      "responses": [
+        {
+          "draft": "d2",
+          "issue": "i1",
+          "disposition": "defend",
+          "explanation": "The dated saved passage supports this scope.",
+          "evidence": [
+            {
+              "version": "v1",
+              "excerpt": "Aster operates 1700 MW on Mars."
+            }
+          ],
+          "applied_edit": null
+        }
+      ]
+    },
+    {
+      "id": "closeout-fresh-dispute",
+      "area": "closeout",
+      "owners": [
+        "NOT-40"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_authoring_budget.py",
+          "symbol": "test_the_soft_limit_switches_to_closeout"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "adjudicate:i1",
+          "revise:binding-edits-only",
+          "review:final"
+        ],
+        "forbidden": [
+          "author:ordinary-rewrite",
+          "author:editorial-round"
+        ],
+        "visible_draft": "d1",
+        "rationale": "In closeout even a fresh factual objection goes directly to adjudication; reserve capacity for edits and final review."
+      },
+      "closeout": true
+    },
+    {
+      "id": "closeout-survives-failure-grant",
+      "area": "closeout",
+      "owners": [
+        "NOT-40"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_authoring_budget.py",
+          "symbol": "test_entering_closeout_survives_a_failure_and_a_grant"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "explicit grant increases review allowance to 1500 after transient adjudicator failure",
+      "expected": {
+        "actions": [
+          "resume:adjudicate-i1-in-closeout"
+        ],
+        "forbidden": [
+          "reset:closeout-after-grant",
+          "author:ordinary-rewrite"
+        ],
+        "visible_draft": "d1",
+        "rationale": "Closeout entry committed before the failed call survives a later grant; cumulative spend remains 40."
+      },
+      "closeout": true
+    },
+    {
+      "id": "hard-limit-preserves-reviewed",
+      "area": "closeout",
+      "owners": [
+        "NOT-40"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_authoring_budget.py",
+          "symbol": "test_the_hard_limit_parks_before_paying_the_author"
+        }
+      ],
+      "changed_assumptions": "Source token accounting permits a call overrun and unconditional final review; Query pre-admits bounded calls and records stopped-at-limit or parks when final review cannot finish.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 40,
+          "total": 1040
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "stop:budget-with-open-work"
+        ],
+        "forbidden": [
+          "author:revision",
+          "adjudicate:i1",
+          "complete:research-sufficient"
+        ],
+        "visible_draft": "d1",
+        "rationale": "Exhausted review allowance cannot purchase another call or imply research sufficiency."
+      },
+      "closeout": true
+    },
+    {
+      "id": "resume-paid-draft",
+      "area": "resume",
+      "owners": [
+        "NOT-40"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_authoring_resume.py",
+          "symbol": "test_every_paid_call_is_committed_before_the_next"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "transient reviewer failure; retry is due",
+      "expected": {
+        "actions": [
+          "review:d1"
+        ],
+        "forbidden": [
+          "author:write-d1",
+          "export:d1",
+          "charge:author-d1-again"
+        ],
+        "visible_draft": null,
+        "rationale": "Committed draft survives reviewer outage; resume its review without repaying author."
+      },
+      "operations": [
+        {
+          "key": "author-d1",
+          "role": "author",
+          "state": "committed",
+          "result": "d1",
+          "used_tokens": 10
+        },
+        {
+          "key": "review-d1",
+          "role": "reviewer",
+          "state": "planned",
+          "result": null,
+          "used_tokens": 0
+        }
+      ]
+    },
+    {
+      "id": "resume-partial-round",
+      "area": "resume",
+      "owners": [
+        "NOT-40"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_authoring_resume.py",
+          "symbol": "test_a_partial_round_resumes_without_repeating_a_call"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i2",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The author defense still misreads this quantity.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "transient adjudicator outage; explicit resume",
+      "expected": {
+        "actions": [
+          "adjudicate:i2"
+        ],
+        "forbidden": [
+          "author:rewrite-d2",
+          "review:d2",
+          "charge:committed-results-again"
+        ],
+        "visible_draft": "d2",
+        "rationale": "Resume the adjudicator step using the two durable drafts and reviews."
+      },
+      "responses": [
+        {
+          "draft": "d2",
+          "issue": "i1",
+          "disposition": "defend",
+          "explanation": "The dated saved passage supports this scope.",
+          "evidence": [
+            {
+              "version": "v1",
+              "excerpt": "Aster operates 900 MW."
+            }
+          ],
+          "applied_edit": null
+        }
+      ],
+      "operations": [
+        {
+          "key": "author-d2",
+          "role": "author",
+          "state": "committed",
+          "result": "d2",
+          "used_tokens": 10
+        },
+        {
+          "key": "review-d2",
+          "role": "reviewer",
+          "state": "committed",
+          "result": "r2",
+          "used_tokens": 10
+        },
+        {
+          "key": "rule-i2",
+          "role": "adjudicator",
+          "state": "planned",
+          "result": null,
+          "used_tokens": 0
+        }
+      ]
+    },
+    {
+      "id": "resume-remote-outcome-unknown",
+      "area": "resume",
+      "owners": [
+        "NOT-40",
+        "NOT-50"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_authoring_resume.py",
+          "symbol": "test_every_paid_call_is_committed_before_the_next"
+        },
+        {
+          "path": "src/services/authoring.py",
+          "symbol": "_drive"
+        }
+      ],
+      "changed_assumptions": "Query persists operation intent before provider I/O and acknowledges uncertain remote billing. Source commits results between calls but does not persist this intent.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "process crash after remote review success before local result commit",
+      "expected": {
+        "actions": [
+          "reconcile:review-d1-unknown-outcome"
+        ],
+        "forbidden": [
+          "claim:exactly-once-provider-billing",
+          "discard:pending-operation"
+        ],
+        "visible_draft": null,
+        "rationale": "Remote success without local commit leaves explicit uncertainty; replay may repeat a remote charge."
+      },
+      "operations": [
+        {
+          "key": "author-d1",
+          "role": "author",
+          "state": "committed",
+          "result": "d1",
+          "used_tokens": 10
+        },
+        {
+          "key": "review-d1",
+          "role": "reviewer",
+          "state": "remote_outcome_unknown",
+          "result": null,
+          "used_tokens": 0
+        }
+      ]
+    },
+    {
+      "id": "permanent-failure-parks",
+      "area": "resume",
+      "owners": [
+        "NOT-40"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_authoring_resume.py",
+          "symbol": "test_a_permanent_error_parks_a_reviewed_run"
+        },
+        {
+          "path": "tests/test_authoring_retry.py",
+          "symbol": "test_a_permanent_error_is_not_retried"
+        }
+      ],
+      "changed_assumptions": "Source calls a reviewed parked run unresolved and an unreviewed one failed. Query uses parked independently of answered/qualified/unresolved outcomes.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "reviewer rejects model configuration permanently",
+      "expected": {
+        "actions": [
+          "park:permanent-provider-failure"
+        ],
+        "forbidden": [
+          "retry:permanent-failure",
+          "export:d2"
+        ],
+        "visible_draft": "d1",
+        "rationale": "A nonretryable failure parks the active step, retaining d1 rather than unreviewed d2."
+      }
+    },
+    {
+      "id": "stale-retry",
+      "area": "resume",
+      "owners": [
+        "NOT-40"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_authoring_resume.py",
+          "symbol": "test_a_continuation_superseded_after_it_was_selected_spends_nothing"
+        }
+      ],
+      "changed_assumptions": "Preserve stale/due/ownership safety using Query operation ownership; do not port DBOS retry generations or weekly scheduler.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "scheduled continuation selected before cancellation or superseding retry",
+      "expected": {
+        "actions": [
+          "return:without-paid-work"
+        ],
+        "forbidden": [
+          "author:call",
+          "reviewer:call",
+          "adjudicator:call",
+          "reopen:canceled-run"
+        ],
+        "visible_draft": "d1",
+        "rationale": "An ineligible continuation performs no provider work; use a fake clock and revalidate ownership."
+      }
+    },
+    {
+      "id": "not-due-retry",
+      "area": "resume",
+      "owners": [
+        "NOT-40"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_authoring_resume.py",
+          "symbol": "test_a_continuation_that_is_not_yet_due_waits"
+        }
+      ],
+      "changed_assumptions": "Preserve stale/due/ownership safety using Query operation ownership; do not port DBOS retry generations or weekly scheduler.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "retry scheduled for 13:00Z; fake clock is 12:00Z",
+      "expected": {
+        "actions": [
+          "return:without-paid-work"
+        ],
+        "forbidden": [
+          "author:call",
+          "reviewer:call",
+          "adjudicator:call",
+          "reopen:canceled-run"
+        ],
+        "visible_draft": "d1",
+        "rationale": "An ineligible continuation performs no provider work; use a fake clock and revalidate ownership."
+      }
+    },
+    {
+      "id": "missing-required-question",
+      "area": "coverage",
+      "owners": [
+        "NOT-39",
+        "NOT-41",
+        "NOT-42"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_an_article_neither_covered_nor_omitted_blocks_approval"
+        },
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_a_repeated_coverage_gap_is_settled_mechanically"
+        }
+      ],
+      "changed_assumptions": "Source mechanically adds omissions and drops unknown article IDs. Query never treats omission bookkeeping as research sufficiency; NOT-41 owns the full stopping-history suite.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": []
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": true,
+          "issues": []
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "advance",
+      "expected": {
+        "actions": [
+          "retain:required-question-operational",
+          "record:coverage-gap-decision"
+        ],
+        "forbidden": [
+          "settle:by-dropping-question",
+          "complete:uninvestigated-requirement"
+        ],
+        "visible_draft": "d2",
+        "rationale": "Deleting the only capacity claim does not close the required operational question."
+      }
+    },
+    {
+      "id": "resume-between-adjudications",
+      "area": "resume",
+      "owners": [
+        "NOT-40"
+      ],
+      "origins": [
+        {
+          "path": "tests/test_digest_authoring.py",
+          "symbol": "test_the_budget_is_checked_between_adjudications"
+        },
+        {
+          "path": "tests/test_authoring_resume.py",
+          "symbol": "test_a_partial_round_resumes_without_repeating_a_call"
+        }
+      ],
+      "changed_assumptions": "Reimplement against Query records and an immutable selected snapshot; no digest status or article queue.",
+      "snapshot": "s1",
+      "drafts": [
+        {
+          "id": "d1",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            },
+            {
+              "id": "expansion",
+              "text": "The expansion is operational.",
+              "question": "operational"
+            }
+          ]
+        },
+        {
+          "id": "d2",
+          "snapshot": "s1",
+          "claims": [
+            {
+              "id": "capacity",
+              "text": "Aster operates 900 MW.",
+              "question": "operational"
+            },
+            {
+              "id": "expansion",
+              "text": "The expansion is operational.",
+              "question": "operational"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "r1",
+          "draft": "d1",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i1",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            },
+            {
+              "id": "i3",
+              "claim": "expansion",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "draft": "d2",
+          "publishable": false,
+          "issues": [
+            {
+              "id": "i2",
+              "claim": "capacity",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            },
+            {
+              "id": "i4",
+              "claim": "expansion",
+              "kind": "factual",
+              "problem": "The quantity needs support.",
+              "evidence": []
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "limits": {
+          "research": 1000,
+          "review": 1000,
+          "total": 2000
+        },
+        "research_spent": 0,
+        "review_spent": 40
+      },
+      "trigger": "process restart after committing rule-i2 and planning rule-i4",
+      "expected": {
+        "actions": [
+          "adjudicate:i4"
+        ],
+        "forbidden": [
+          "adjudicate:i2",
+          "charge:rule-i2-again",
+          "review:d2",
+          "author:rewrite-d2"
+        ],
+        "visible_draft": "d2",
+        "rationale": "The first of two repeated disputes already has a committed ruling; resume only the second."
+      },
+      "rulings": [
+        {
+          "id": "a1",
+          "issue": "i2",
+          "snapshot": "s1",
+          "claim": "capacity",
+          "claim_text": "Aster operates 900 MW.",
+          "decision": "supported",
+          "rationale": "The saved operational passage decides this claim.",
+          "replacement": null
+        }
+      ],
+      "operations": [
+        {
+          "key": "rule-i2",
+          "role": "adjudicator",
+          "state": "committed",
+          "result": "a1",
+          "used_tokens": 10
+        },
+        {
+          "key": "rule-i4",
+          "role": "adjudicator",
+          "state": "planned",
+          "result": null,
+          "used_tokens": 0
+        }
+      ]
+    }
+  ]
+}
