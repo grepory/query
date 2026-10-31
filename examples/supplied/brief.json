@@ -1,0 +1,10 @@
+{
+  "question": "What capacity is operational at Aster?",
+  "scope": "Only the supplied synthetic capacity announcement.",
+  "cutoff": "2026-10-01",
+  "questions": [{
+    "key": "operational",
+    "text": "How much capacity is operational?",
+    "acceptance_criteria": "Separate operational from planned capacity and record its date."
+  }]
+}

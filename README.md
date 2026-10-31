@@ -70,7 +70,9 @@ Version IDs name immutable exact text. `load_source_version` resolves passages;
 `load_snapshot` reconstructs a manifest, saved versions, and frozen provenance.
 Oversized inputs and selections are recorded explicitly. See
 [persistence](docs/persistence.md#supplied-evidence) for limits, exclusions, retry
-identity, and lifecycle constraints. CLI ingestion belongs to NOT-35.
+identity, and lifecycle constraints. The [lifecycle CLI](docs/cli.md) exposes
+ingestion, snapshot freezing, explicit advance/resume, deterministic fixture
+steps, inspection, and self-contained exports.
 
 ## Dependency updates
 
