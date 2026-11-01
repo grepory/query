@@ -23,6 +23,7 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.usage import UsageLimits
 
+from query.citations import CitationIndex
 from query.config import ModelSettings
 from query.investigation import Contract
 from query.models import build_model
@@ -34,10 +35,12 @@ from query.review import (
     ReviewContext,
     Ruling,
     check_answer,
+    check_answer_for_adjudication,
     check_applications,
     check_citations,
     check_response,
     check_review,
+    check_review_for_adjudication,
     check_ruling,
     check_scope,
     check_standing_ruling,
@@ -93,7 +96,11 @@ including checked evidence statuses, and the supplied source passages even where
 neither party quoted them. Unverified quotations are model assertions, not checked
 evidence; not_found quotations carry no evidentiary weight. Only the SOURCE PACKET
 is source material for this invocation. Its explicit omissions may make context
-insufficient. Return supported, narrow (with exact replacement wording), remove,
+insufficient. Verification against the snapshot is distinct from packet availability:
+passage_in_packet=false or quote_available=false cannot supply source support for
+this invocation, even if the quote was verified elsewhere in the snapshot.
+Read the mechanically checked claim and premise evidence too. Return supported,
+narrow (with exact replacement wording), remove,
 or insufficient_evidence (with missing context). A ruling applies only to the
 exact claim text and snapshot. You cannot resolve missing research by fiat or
 decide that an investigation has enough evidence to stop.
@@ -103,7 +110,7 @@ PROMPTS = {"author": AUTHOR, "reviewer": REVIEWER, "adjudicator": ADJUDICATOR}
 PROMPT_VERSIONS = {
     "author": "query-author-v1",
     "reviewer": "query-reviewer-v1",
-    "adjudicator": "query-adjudicator-v1",
+    "adjudicator": "query-adjudicator-v2",
 }
 
 
@@ -413,8 +420,9 @@ class ReviewClients:
         if previous_review is not None:
             previous_review = Review.model_validate(previous_review.model_dump())
             check_scope(previous_review, context)
-            for issue in previous_review.issues:
-                check_citations(issue.evidence_examined, context)
+            check_citations(
+                [c for issue in previous_review.issues for c in issue.evidence_examined], context
+            )
         if answer.issue_responses:
             if previous_review is None:
                 raise ValueError("Reviewing issue responses requires their saved previous review")
@@ -460,15 +468,15 @@ class ReviewClients:
         context = self._context(context)
         answer = Answer.model_validate(answer.model_dump())
         review = Review.model_validate(review.model_dump())
-        check_answer(answer, context)
-        check_review(review, answer, context)
+        check_answer_for_adjudication(answer, context)
+        check_review_for_adjudication(review, answer, context)
+        index = CitationIndex(context)
         issue = next((i for i in review.issues if i.id == issue_id), None)
         if issue is None or issue.kind not in {"factual", "inference"}:
             raise ValueError("Adjudication requires one factual/inference issue")
         if response is not None:
             response = IssueResponse.model_validate(response.model_dump())
             check_response(response, review)
-            check_citations(response.evidence, context)
             if response.issue_id != issue_id:
                 raise ValueError("Author response belongs to a different issue")
         passages = context.passages()
@@ -482,21 +490,39 @@ class ReviewClients:
         omitted = [p["passage_id"] for p in passages if UUID(p["passage_id"]) not in selected]
         if omitted and (omission_reason is None or not omission_reason.strip()):
             raise ValueError("Partial adjudication packets require an explicit omission reason")
+        selected_pairs = {
+            (p["version_id"], p["passage_id"])
+            for p in passages
+            if UUID(p["passage_id"]) in selected
+        }
 
         def checks(supplied, citations):
-            values = (
-                tuple(EvidenceCheck.model_validate(c.model_dump()) for c in supplied)
-                if supplied is not None
-                else tuple(
-                    EvidenceCheck(
-                        citation=c, status="unverified", reason="NOT-38 has not checked this quote"
+            resolved = tuple(index.resolve(c) for c in citations)
+            values = tuple(r.check for r in resolved)
+            if supplied is not None:
+                supplied = tuple(EvidenceCheck.model_validate(c.model_dump()) for c in supplied)
+                if tuple((c.citation, c.status) for c in supplied) != tuple(
+                    (c.citation, c.status) for c in values
+                ):
+                    raise ValueError(
+                        "Supplied evidence checks disagree with mechanical verification"
                     )
-                    for c in citations
+            result = []
+            for resolution in resolved:
+                checked = resolution.check
+                available = (
+                    str(checked.citation.version_id),
+                    str(checked.citation.passage_id),
+                ) in selected_pairs
+                result.append(
+                    {
+                        **checked.model_dump(mode="json"),
+                        "match_kind": resolution.match_kind,
+                        "passage_in_packet": available,
+                        "quote_available": available and checked.status == "verified",
+                    }
                 )
-            )
-            if tuple(c.citation for c in values) != tuple(citations):
-                raise ValueError("Evidence checks must match the exact party citations")
-            return [c.model_dump(mode="json") for c in values]
+            return result
 
         def validate(ruling):
             check_ruling(ruling, review, context)
@@ -505,6 +531,7 @@ class ReviewClients:
             if any(c.passage_id not in selected for c in ruling.evidence):
                 raise ValueError("Ruling evidence must appear in the adjudication source packet")
 
+        targeted = next((c for c in answer.claims if c.id == issue.claim_id), None)
         return self._call(
             "adjudicator",
             Ruling,
@@ -516,10 +543,14 @@ class ReviewClients:
                 "answer_id": str(answer.id),
                 "review_id": str(review.id),
                 "issue": issue.model_dump(mode="json"),
-                "targeted_claim": next(
-                    (c.model_dump(mode="json") for c in answer.claims if c.id == issue.claim_id),
-                    None,
-                ),
+                "targeted_claim": targeted.model_dump(mode="json") if targeted else None,
+                "claim_evidence": checks(None, targeted.citations) if targeted else [],
+                "premise_evidence": [
+                    {"premise_id": p.id, "checks": checks(None, p.citations)}
+                    for p in targeted.premises
+                ]
+                if targeted
+                else [],
                 "disputed_answer_span": issue.claim_text,
                 "author_response": response.model_dump(mode="json") if response else None,
                 "reviewer_evidence": checks(reviewer_checks, issue.evidence_examined),

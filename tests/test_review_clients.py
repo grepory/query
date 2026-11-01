@@ -52,7 +52,7 @@ def citation(context, index=0):
     return {
         "version_id": passage["version_id"],
         "passage_id": passage["passage_id"],
-        "excerpt": "Aster reports 900 MW operational",
+        "excerpt": passage["text"],
     }
 
 
@@ -237,7 +237,11 @@ def test_adjudicator_receives_both_arguments_checked_failures_and_independent_so
     captured = []
     client = ReviewClients(config(), adjudicator_model=function(ruling_data(context), captured))
     response = IssueResponse.model_validate(response_data(context))
-    review = Review.model_validate(review_data(context))
+    data = review_data(context)
+    data["issues"][0]["evidence_examined"][0]["excerpt"] = (
+        "Invented quote: Aster operates 1700 MW on Mars."
+    )
+    review = Review.model_validate(data)
     checks = (
         EvidenceCheck(
             citation=review.issues[0].evidence_examined[0],
@@ -258,13 +262,14 @@ def test_adjudicator_receives_both_arguments_checked_failures_and_independent_so
     assert packet["author_response"]["explanation"] == response.explanation
     assert packet["issue"]["problem"] == review.issues[0].problem
     assert packet["reviewer_evidence"][0]["status"] == "not_found"
-    assert packet["author_evidence"][0]["status"] == "unverified"
+    assert packet["author_evidence"][0]["status"] == "verified"
     assert (
         len(packet["source_packet"]) == 2
     )  # Includes the independent ledger neither party quoted.
     assert not packet["omitted_passage_ids"]
     assert "not_found quotations carry no" in instructions
     assert result.output.decision == "supported"
+    assert result.prompt_version == "query-adjudicator-v2"
 
 
 def test_partial_packet_exposes_omissions_and_cannot_cite_omitted_passage(context):
@@ -717,3 +722,128 @@ def test_historical_binding_edit_is_recorded_when_current_review_has_no_issue(co
     assert not result.issue_responses and result.ruling_applications[0].ruling_id == saved_ruling.id
     clients.review(context, UUID(int=7), result, rulings=(saved_ruling,))
     assert captured[0][0]["rulings"][0]["review_id"] == str(UUID(int=2))
+
+
+def test_role_outputs_reject_fabricated_quotes_with_known_usage(context):
+    for role, data in (
+        ("author", answer_data(context)),
+        ("reviewer", review_data(context)),
+        ("adjudicator", ruling_data(context)),
+    ):
+        if role == "author":
+            data["claims"][0]["citations"][0]["excerpt"] = "A fabricated quotation."
+        elif role == "reviewer":
+            data["issues"][0]["evidence_examined"][0]["excerpt"] = "A fabricated quotation."
+        else:
+            data["evidence"][0]["excerpt"] = "A fabricated quotation."
+        client = ReviewClients(config(), **{role + "_model": TestModel(custom_output_args=data)})
+        with pytest.raises(RoleCallError) as error:
+            invoke(client, role, context)
+        assert error.value.kind == "invalid_output" and error.value.usage.requests == 1
+
+
+def test_adjudication_marks_foreign_party_citations_without_accepting_them(context):
+    data = answer_data(context)
+    data["claims"][0]["citations"][0]["version_id"] = str(UUID(int=999))
+    review = review_data(context)
+    review["issues"][0]["evidence_examined"][0]["version_id"] = str(UUID(int=999))
+    response = response_data(context)
+    response["evidence"][0]["version_id"] = str(UUID(int=999))
+    captured = []
+    client = ReviewClients(config(), adjudicator_model=function(ruling_data(context), captured))
+    answer = Answer.model_validate(data)
+    with pytest.raises(ValueError, match="Citation verification failed"):
+        client.review(context, UUID(int=2), answer)
+    client.adjudicate(
+        context,
+        UUID(int=3),
+        answer,
+        Review.model_validate(review),
+        "capacity-issue",
+        IssueResponse.model_validate(response),
+    )
+    packet = captured[0][0]
+    for key in ("claim_evidence", "reviewer_evidence", "author_evidence"):
+        assert packet[key][0]["status"] == "not_found"
+        assert packet[key][0]["reason"] == "unknown_source_version"
+        assert not packet[key][0]["quote_available"]
+    assert len(packet["source_packet"]) == 2
+
+
+def test_forged_verified_status_is_rejected_before_provider_call(context):
+    review = review_data(context)
+    review["issues"][0]["evidence_examined"][0]["excerpt"] = "Invented support for 1700 MW."
+    review = Review.model_validate(review)
+    forged = EvidenceCheck(
+        citation=review.issues[0].evidence_examined[0], status="verified", reason=None
+    )
+    captured = []
+    client = ReviewClients(config(), adjudicator_model=function(ruling_data(context), captured))
+    with pytest.raises(ValueError, match="disagree with mechanical verification"):
+        client.adjudicate(
+            context,
+            UUID(int=3),
+            Answer.model_validate(answer_data(context)),
+            review,
+            "capacity-issue",
+            None,
+            reviewer_checks=(forged,),
+        )
+    assert not captured
+
+
+def test_snapshot_verified_quote_omitted_from_packet_is_explicitly_unavailable(context):
+    captured = []
+    ruling = ruling_data(context)
+    ruling["evidence"] = [citation(context, 1)]
+    client = ReviewClients(config(), adjudicator_model=function(ruling, captured))
+    selected = (UUID(context.passages()[1]["passage_id"]),)
+    client.adjudicate(
+        context,
+        UUID(int=3),
+        Answer.model_validate(answer_data(context)),
+        Review.model_validate(review_data(context)),
+        "capacity-issue",
+        IssueResponse.model_validate(response_data(context)),
+        passage_ids=selected,
+        omission_reason="Explicit packet truncation for this test",
+    )
+    packet, instructions = captured[0]
+    for key in ("claim_evidence", "reviewer_evidence", "author_evidence"):
+        assert packet[key][0]["status"] == "verified"
+        assert not packet[key][0]["passage_in_packet"]
+        assert not packet[key][0]["quote_available"]
+    assert len(packet["omitted_passage_ids"]) == 1
+    assert "quote_available=false" in instructions
+
+
+def test_disputed_inference_premises_get_mechanical_checks_in_packet(context):
+    data = answer_data(context)
+    claim = data["claims"][0]
+    bad_citation = citation(context)
+    bad_citation["excerpt"] = "A fabricated premise quotation."
+    claim.update(
+        kind="inference",
+        reasoning="Explicit disputed inference.",
+        premises=[
+            {"id": "real", "text": "Real premise", "citations": [citation(context)]},
+            {"id": "fabricated", "text": "Unsupported premise", "citations": [bad_citation]},
+        ],
+    )
+    captured = []
+    client = ReviewClients(config(), adjudicator_model=function(ruling_data(context), captured))
+    client.adjudicate(
+        context,
+        UUID(int=3),
+        Answer.model_validate(data),
+        Review.model_validate(review_data(context)),
+        "capacity-issue",
+        None,
+    )
+    evidence = captured[0][0]["premise_evidence"]
+    assert evidence[0]["premise_id"] == "real" and evidence[0]["checks"][0]["status"] == "verified"
+    assert (
+        evidence[1]["premise_id"] == "fabricated"
+        and evidence[1]["checks"][0]["status"] == "not_found"
+    )
+    assert not evidence[1]["checks"][0]["quote_available"]

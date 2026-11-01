@@ -24,10 +24,10 @@ and rulings are supplied by the caller. The client rejects returned IDs, brief
 versions or snapshot IDs that do not match the request.
 
 Citation records name immutable source-version and passage IDs and preserve exact
-excerpt whitespace. This ticket validates that the named passage belongs to the
-selected snapshot. It **does not** establish excerpt occurrence, normalization,
-semantic support or inference validity. NOT-38 supplies checked quote results;
-reviewers and adjudicators still assess what the evidence means.
+excerpt whitespace. The [citation verifier](citation-verification.md) checks quote
+occurrence in the named selected passage and resolves it to original saved text.
+It does not establish semantic support or inference validity; reviewers and
+adjudicators still assess what the evidence means.
 
 ## Role records
 
@@ -83,10 +83,10 @@ evidence must occur in that packet, not merely elsewhere in the snapshot.
 
 `reviewer_checks` and `author_checks` must correspond exactly to the parties'
 citations. Every check is `verified`, `not_found` or `unverified`, with explicit
-reasons for unchecked/failed quotes. Without NOT-38 checks, quotes are labeled
-unverified. Failures remain in the packet and are explicitly denied evidentiary
-weight by the prompt. These caller-supplied check records are a boundary for the
-later verifier, not proof that this module has performed quote verification.
+reasons for unchecked/failed quotes. The client computes each quote status and
+rejects conflicting caller-supplied statuses. Failures remain in the packet and
+are denied evidentiary weight. Checks distinguish snapshot verification from
+availability in the selected packet, including targeted claim and premise citations.
 
 The adjudicator is a separate invocation with no shared conversation state. It
 may use the reviewer's vendor/model; independence does not require a third vendor.
