@@ -46,7 +46,7 @@ def brief():
 
 @pytest.fixture
 def run(store, brief):
-    return store.create(brief, Limits(research=100, review=100, total=150))
+    return store.create(brief, Limits(research=100, review=100, total=150), lifetime_tokens=300)
 
 
 def request(key="extract-1", tokens=40):

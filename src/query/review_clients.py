@@ -246,7 +246,10 @@ class ReviewClients:
         self, role: Role, output_type: type[T], context: ReviewContext, payload: dict, validate
     ) -> ModelCall[T]:
         prompt = json.dumps(payload, ensure_ascii=False, sort_keys=True)
-        if len((PROMPTS[role] + prompt).encode()) > self.limits.max_prompt_bytes:
+        # Structured output and provider framing consume input beyond the party payload.
+        schema_bytes = len(json.dumps(output_type.model_json_schema(), ensure_ascii=False).encode())
+        estimated_bytes = len((PROMPTS[role] + prompt).encode()) + 2 * schema_bytes + 8192
+        if estimated_bytes > self.limits.max_prompt_bytes:
             raise RoleCallError(role, "context_limit", retryable=False)
         models = ReviewModels.model_validate(self.models.model_dump())
         settings = getattr(models, role) or models.reviewer

@@ -3,8 +3,8 @@
 `query.review` defines Query's answer/review records. `query.review_clients`
 performs explicit, bounded Pydantic AI calls. Neither module changes the durable
 investigation lifecycle, runs research, or decides whether enough research has
-been done. The [durable controller](answer-loop.md) wires persistence in NOT-39; execution
-ownership, budget admission and scheduled retries belong to NOT-40. Mechanical
+been done. The [durable controller](answer-loop.md) wires persistence in NOT-39; NOT-40
+adds [ownership, reserve and explicit retry recovery](review-recovery.md). Mechanical
 quote verification belongs to NOT-38 and stopping enforcement to NOT-42.
 
 ## Scope and evidence
@@ -107,7 +107,10 @@ OpenAI-compatible endpoints do not establish vendor identity, so they cannot
 satisfy this pair's separation rule. Existing local model smoke evals remain
 available. With no adjudicator setting, it uses reviewer configuration.
 
-`ReviewClients(models, limits=CallLimits(...))` builds fresh agents lazily. Only
+`ReviewClients(models, limits=CallLimits(...))` builds fresh agents lazily.
+The prompt byte cap includes rendered instructions/payload, twice the structured
+output schema and an explicit provider framing allowance; it is a conservative
+admission estimate. SDK transport retries are disabled. Only
 `TestModel`/`FunctionModel` may be injected through the explicit offline overrides;
 arbitrary prebuilt agents or real-model overrides cannot add tools or mislabel a
 vendor. Agents have no function/native browsing or acquisition tools; structured

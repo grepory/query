@@ -157,6 +157,8 @@ The [review contracts](docs/review-contracts.md) define snapshot-scoped author,
 reviewer and adjudicator calls, explicit inference support, and provider failures.
 The [durable answer loop](docs/answer-loop.md) persists drafts, full reviews and
 scoped rulings, resumes committed work, and exposes only reviewed answer pairs.
+The [review recovery guide](docs/review-recovery.md) covers closeout, final-review
+reserve, attempt usage, lifetime ceilings, executor ownership and explicit retries.
 The [citation verifier](docs/citation-verification.md) checks quotes against their
 named saved passages and exposes failed evidence and adjudication omissions.
 The [stopping-decision suite and rubric](docs/stopping-decisions.md) supplies the

@@ -60,3 +60,16 @@ def test_hosted_models_ignore_foreign_base_urls(monkeypatch, backend, expected):
     )
     model = build_model(settings)
     assert str(model.client.base_url).rstrip("/") == expected.rstrip("/")
+
+
+@pytest.mark.parametrize("backend", ["openai", "anthropic", "local"])
+def test_sdk_retries_are_disabled_so_durable_attempts_own_retry_accounting(backend):
+    settings = ModelSettings(
+        _env_file=None,
+        model_backend=backend,
+        model_name="offline-test",
+        openai_api_key="fake",
+        anthropic_api_key="fake",
+        local_base_url="http://127.0.0.1:1234/v1",
+    )
+    assert build_model(settings).client.max_retries == 0

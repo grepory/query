@@ -5,6 +5,7 @@ from typing import Literal
 from query.answer_loop import LoopState, ReviewedAnswer
 from query.evidence import EvidenceInput, EvidenceSnapshot, SourceVersion
 from query.investigation import Contract, Investigation
+from query.recovery import ReviewAttempt
 
 
 class InvestigationExport(Contract):
@@ -16,3 +17,4 @@ class InvestigationExport(Contract):
 
     answer_loop: LoopState | None = None
     last_reviewed_answer: ReviewedAnswer | None = None
+    review_attempts: tuple[ReviewAttempt, ...] = ()
