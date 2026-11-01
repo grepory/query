@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import Field, ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
+from query.answer_loop import AnswerController
 from query.config import Settings
 from query.db import database_engine
 from query.evidence import FreezeSnapshot, IngestText
@@ -23,6 +24,7 @@ from query.investigation import (
     StepRequest,
     StepResult,
 )
+from query.review_clients import CallLimits, ReviewClients, ReviewModels, RoleCallError
 from query.store import InvestigationStore, StaleRevision
 
 
@@ -76,6 +78,12 @@ def parser() -> argparse.ArgumentParser:
             mode = cmd.add_mutually_exclusive_group(required=True)
             mode.add_argument("--to", choices=[p.value for p in Phase])
             mode.add_argument("--fixture", type=Path, help="Execute one explicit simulated step")
+            mode.add_argument(
+                "--answer-models",
+                type=Path,
+                help="Execute one answer-loop action using explicit ReviewModels JSON",
+            )
+            cmd.add_argument("--call-limits", type=Path, help="Optional bounded CallLimits JSON")
             cmd.add_argument("--reason")
             cmd.add_argument("--checks", type=Path, help="Caller-supplied CompletionChecks JSON")
             cmd.add_argument("--outcome", choices=[o.value for o in Outcome])
@@ -154,6 +162,16 @@ def execute(store: InvestigationStore, args):
         if args.limits:
             current = store.grant(args.id, args.revision, read_json(args.limits, Limits))
         return store.resume(args.id, current.revision)
+    if args.answer_models:
+        if args.reason or args.checks or args.outcome:
+            raise ValueError("--reason, --checks and --outcome require --to")
+        clients = ReviewClients(
+            read_json(args.answer_models, ReviewModels),
+            limits=read_json(args.call_limits, CallLimits) if args.call_limits else None,
+        )
+        return AnswerController(store, clients).advance(args.id, args.revision)
+    if args.call_limits:
+        raise ValueError("--call-limits requires --answer-models")
     if args.fixture:
         if args.reason or args.checks or args.outcome:
             raise ValueError("--reason, --checks and --outcome require --to, not --fixture")
@@ -190,6 +208,11 @@ def main(argv=None) -> int:
         else:
             sys.stdout.write(rendered)
         return 0
+    except RoleCallError as exc:
+        print(
+            f"query: {exc}. The planned answer operation is retained; inspect before retrying.",
+            file=sys.stderr,
+        )
     except StaleRevision as exc:
         print(f"query: {exc}. Run inspect and retry with its revision.", file=sys.stderr)
     except KeyError as exc:

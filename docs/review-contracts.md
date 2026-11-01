@@ -3,7 +3,7 @@
 `query.review` defines Query's answer/review records. `query.review_clients`
 performs explicit, bounded Pydantic AI calls. Neither module changes the durable
 investigation lifecycle, runs research, or decides whether enough research has
-been done. The controller and persistence wiring belong to NOT-39; execution
+been done. The [durable controller](answer-loop.md) wires persistence in NOT-39; execution
 ownership, budget admission and scheduled retries belong to NOT-40. Mechanical
 quote verification belongs to NOT-38 and stopping enforcement to NOT-42.
 
@@ -55,8 +55,10 @@ can be answered, adjudicated and removed through the same contracts; an incomple
 author inventory cannot prevent factual review.
 
 Standing rulings can come from an earlier review/answer in the same snapshot.
-Their original provenance is retained and their claim ID **and exact text** must
-still match the current answer. A changed claim or snapshot cannot inherit them.
+Their original provenance is retained. Supported rulings require exact claim
+identity; changed claims or snapshots cannot inherit approval. Binding narrow/remove
+edits remain applicable while the exact ruled assertion survives in title/body,
+even if its inventory entry changed or disappeared.
 Narrow/remove revisions must record a `RulingApplication` even when the latest
 review has no corresponding issue. Full review receives the supplied ruling
 provenance and applied edits. Durable retrieval and applicability decisions remain
@@ -87,6 +89,10 @@ reasons for unchecked/failed quotes. The client computes each quote status and
 rejects conflicting caller-supplied statuses. Failures remain in the packet and
 are denied evidentiary weight. Checks distinguish snapshot verification from
 availability in the selected packet, including targeted claim and premise citations.
+
+The controller may supply `response_review` for an earlier saved defense. Its
+original review/issue IDs remain intact in the packet; its exact claim scope must
+match the present dispute. The adjudicator prompt is versioned `query-adjudicator-v3`.
 
 The adjudicator is a separate invocation with no shared conversation state. It
 may use the reviewer's vendor/model; independence does not require a third vendor.

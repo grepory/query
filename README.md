@@ -152,9 +152,11 @@ separate from deterministic correctness tests.
 See [architecture decisions](docs/architecture.md) for scope and persistence choices
 and [local model candidates](docs/local-models.md) for the initial shortlist.
 The [review invariant inventory](docs/review-invariants.md) maps the pinned aibyai
-reference to synthetic Query histories for the upcoming review controller.
+reference to synthetic Query histories exercised by the durable review controller.
 The [review contracts](docs/review-contracts.md) define snapshot-scoped author,
 reviewer and adjudicator calls, explicit inference support, and provider failures.
+The [durable answer loop](docs/answer-loop.md) persists drafts, full reviews and
+scoped rulings, resumes committed work, and exposes only reviewed answer pairs.
 The [citation verifier](docs/citation-verification.md) checks quotes against their
 named saved passages and exposes failed evidence and adjudication omissions.
 The [stopping-decision suite and rubric](docs/stopping-decisions.md) supplies the

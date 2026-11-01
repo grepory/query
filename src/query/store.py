@@ -7,6 +7,14 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection, Engine
 
 from query import db
+from query.answer_loop import (
+    KIND,
+    Execution,
+    Operation,
+    last_reviewed,
+    reconstruct,
+    validate_result,
+)
 from query.evidence import (
     EvidenceInput,
     EvidenceSnapshot,
@@ -41,6 +49,7 @@ from query.investigation import (
     StepResult,
     transition,
 )
+from query.review import ReviewContext
 
 
 class StaleRevision(ValueError):
@@ -107,12 +116,44 @@ class InvestigationStore:
                     .order_by(db.evidence_snapshots.c.manifest["revision"].as_integer())
                 ).scalars()
             )
+            investigation = self._read(conn, identifier)
             return InvestigationExport(
-                investigation=self._read(conn, identifier),
+                investigation=investigation,
+                last_reviewed_answer=last_reviewed(investigation.steps),
                 evidence_inputs=observations,
                 source_versions=tuple(self._read_source_version(conn, v) for v in version_ids),
                 snapshots=snapshots,
+                answer_loop=(
+                    self._answer_state(conn, identifier)[2]
+                    if any(
+                        s.brief_version == investigation.checkpoint.brief_version for s in snapshots
+                    )
+                    else None
+                ),
             )
+
+    def answer_state(self, identifier: UUID):
+        with self.engine.begin() as conn:
+            self._lock(conn, identifier, read=True)
+            return self._answer_state(conn, identifier)
+
+    def _answer_state(self, conn, identifier):
+        current = self._read(conn, identifier)
+        snapshot_id = conn.execute(
+            select(db.evidence_snapshots.c.id)
+            .where(
+                db.evidence_snapshots.c.investigation_id == identifier,
+                db.evidence_snapshots.c.brief_version == current.checkpoint.brief_version,
+            )
+            .order_by(db.evidence_snapshots.c.manifest["revision"].as_integer().desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        if snapshot_id is None:
+            raise ValueError("Freeze a snapshot for the current brief before answering")
+        context = ReviewContext(
+            brief=current.briefs[-1], evidence=self._read_snapshot(conn, snapshot_id)
+        )
+        return current, context, reconstruct(context, current.steps)
 
     def revise_brief(self, identifier: UUID, expected_revision: int, brief: Brief) -> Investigation:
         with self.engine.begin() as conn:
@@ -234,6 +275,42 @@ class InvestigationStore:
             self._require_no_pending(conn, identifier)
             if request.reserved_tokens > current.budget.remaining(request.lane):
                 raise ValueError("Step exceeds remaining token allowance")
+            if request.kind == KIND:
+                investigation, _, state = self._answer_state(conn, identifier)
+                operation = Operation.model_validate(request.inputs.get("operation"))
+                if (
+                    operation != state.next_operation
+                    or request.key != operation.key
+                    or request.lane != Lane.REVIEW
+                ):
+                    raise ValueError("Answer-loop intent must match the next durable decision")
+                if operation.action != "carry_forward":
+                    execution = Execution.model_validate(request.inputs.get("execution"))
+                    for saved in investigation.steps:
+                        if (
+                            saved.request.kind == KIND
+                            and saved.request.inputs["operation"]["snapshot_id"]
+                            == str(operation.snapshot_id)
+                            and saved.request.inputs.get("execution") is not None
+                        ):
+                            pinned = Execution.model_validate(saved.request.inputs["execution"])
+                            if pinned.models != execution.models:
+                                raise ValueError(
+                                    "Role models are pinned for the snapshot answer loop"
+                                )
+                            break
+                    expected_role = {
+                        "write": "author",
+                        "revise": "author",
+                        "review": "reviewer",
+                        "adjudicate": "adjudicator",
+                    }[operation.action]
+                    if (
+                        execution.role != expected_role
+                        or request.reserved_tokens
+                        < execution.limits.max_prompt_bytes + execution.limits.max_output_tokens
+                    ):
+                        raise ValueError("Role intent must reserve its bounded call allowance")
             step = Step(brief_version=current.brief_version, request=request)
             conn.execute(
                 insert(db.steps).values(
@@ -261,6 +338,20 @@ class InvestigationStore:
                 if step.result != result:
                     raise ValueError("A committed result cannot be replaced")
                 return self._read(conn, identifier)
+            if step.request.kind == KIND:
+                _, context, state = self._answer_state(conn, identifier)
+                operation = Operation.model_validate(step.request.inputs["operation"])
+                if operation != state.next_operation:
+                    raise ValueError("Answer-loop result does not match the pending decision")
+                validate_result(
+                    operation,
+                    result,
+                    state,
+                    context,
+                    Execution.model_validate(step.request.inputs["execution"])
+                    if operation.action != "carry_forward"
+                    else None,
+                )
             # Record real usage even when the provider exceeds its reservation.
             budget = current.budget.model_dump()
             counter = "research_spent" if step.request.lane == Lane.RESEARCH else "review_spent"

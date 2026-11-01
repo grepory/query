@@ -269,7 +269,7 @@ def test_adjudicator_receives_both_arguments_checked_failures_and_independent_so
     assert not packet["omitted_passage_ids"]
     assert "not_found quotations carry no" in instructions
     assert result.output.decision == "supported"
-    assert result.prompt_version == "query-adjudicator-v2"
+    assert result.prompt_version == "query-adjudicator-v3"
 
 
 def test_partial_packet_exposes_omissions_and_cannot_cite_omitted_passage(context):
@@ -847,3 +847,43 @@ def test_disputed_inference_premises_get_mechanical_checks_in_packet(context):
         and evidence[1]["checks"][0]["status"] == "not_found"
     )
     assert not evidence[1]["checks"][0]["quote_available"]
+
+
+def test_adjudication_retains_prior_defense_review_provenance(context):
+    answer = Answer.model_validate(answer_data(context))
+    old_review = Review.model_validate(review_data(context))
+    current_data = review_data(context)
+    current_data["id"] = str(UUID(int=20))
+    current_data["issues"][0]["id"] = "reworded-objection"
+    current_data["issues"][0]["problem"] = "Still disputes the same exact claim."
+    current_review = Review.model_validate(current_data)
+    result = ruling_data(context)
+    result.update(review_id=str(current_review.id), issue_id="reworded-objection")
+    captured = []
+    clients = ReviewClients(config(), adjudicator_model=function(result, captured))
+    response = IssueResponse.model_validate(response_data(context))
+    clients.adjudicate(
+        context,
+        UUID(int=3),
+        answer,
+        current_review,
+        "reworded-objection",
+        response,
+        response_review=old_review,
+    )
+    payload = captured[0][0]
+    assert payload["author_response"]["review_id"] == str(old_review.id)
+    assert payload["author_response"]["issue_id"] == "capacity-issue"
+    assert payload["response_review"] == old_review.model_dump(mode="json")
+    assert payload["review_id"] == str(current_review.id)
+    wrong = response.model_copy(update={"claim_text": "Changed assertion"})
+    with pytest.raises(ValueError, match="exact reviewed issue"):
+        clients.adjudicate(
+            context,
+            UUID(int=3),
+            answer,
+            current_review,
+            "reworded-objection",
+            wrong,
+            response_review=old_review,
+        )
