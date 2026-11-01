@@ -155,6 +155,8 @@ The [review invariant inventory](docs/review-invariants.md) maps the pinned aiby
 reference to synthetic Query histories for the upcoming review controller.
 The [review contracts](docs/review-contracts.md) define snapshot-scoped author,
 reviewer and adjudicator calls, explicit inference support, and provider failures.
+The [citation verifier](docs/citation-verification.md) checks quotes against their
+named saved passages and exposes failed evidence and adjudication omissions.
 The [stopping-decision suite and rubric](docs/stopping-decisions.md) supplies the
 nine stopping histories, decision-changing boundaries, compact YAML authoring, and
 offline human/model scoring under a human-approved rubric. Run

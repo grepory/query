@@ -185,6 +185,7 @@ class ReviewContext(ReviewContract):
             raise ValueError("Brief and snapshot must have the same version")
         versions = {v.id: v for v in self.evidence.versions}
         unique([v.id for v in self.evidence.versions], "source version")
+        unique([p.id for v in self.evidence.versions for p in v.passages], "saved passage ID")
         unique([c.version_id for c in snapshot.candidates], "snapshot candidate")
         if set(versions) != {c.version_id for c in snapshot.candidates}:
             raise ValueError("Snapshot candidates must match loaded versions")
@@ -265,10 +266,13 @@ def check_scope(record: Scope, context: ReviewContext):
 
 
 def check_citations(citations, context: ReviewContext):
-    included = {(p["version_id"], p["passage_id"]) for p in context.passages()}
-    for citation in citations:
-        if (str(citation.version_id), str(citation.passage_id)) not in included:
-            raise ValueError("Citation does not name an included snapshot passage")
+    from query.citations import CitationIndex
+
+    if not citations:
+        return
+    for checked in CitationIndex(context).check_all(citations):
+        if checked.status != "verified":
+            raise ValueError(f"Citation verification failed: {checked.reason}")
 
 
 def check_coverage(coverage, claims, context: ReviewContext):
@@ -286,26 +290,37 @@ def check_coverage(coverage, claims, context: ReviewContext):
             raise ValueError("Answered coverage must identify supporting claims")
 
 
-def check_answer(answer: Answer, context: ReviewContext):
+def _check_answer(answer: Answer, context: ReviewContext, *, verify: bool):
     check_scope(answer, context)
     unique([c.id for c in answer.claims], "claim")
     questions = {q.key for q in context.brief.brief.questions}
+    citations = []
     for claim in answer.claims:
         if not set(claim.question_ids) <= questions:
             raise ValueError("Claim names an unknown brief question")
         if claim.text not in answer.title and claim.text not in answer.body_markdown:
             raise ValueError("Claim must quote an exact span of the answer title or body")
-        check_citations(claim.citations, context)
+        citations.extend(claim.citations)
         for premise in claim.premises:
-            check_citations(premise.citations, context)
+            citations.extend(premise.citations)
     check_coverage(answer.coverage, {c.id: c for c in answer.claims}, context)
     unique([r.issue_id for r in answer.issue_responses], "issue response")
     unique([r.ruling_id for r in answer.ruling_applications], "ruling application")
-    for response in answer.issue_responses:
-        check_citations(response.evidence, context)
+    citations.extend(c for response in answer.issue_responses for c in response.evidence)
+    if verify and citations:
+        check_citations(citations, context)
 
 
-def check_review(review: Review, answer: Answer, context: ReviewContext):
+def check_answer(answer: Answer, context: ReviewContext):
+    _check_answer(answer, context, verify=True)
+
+
+def check_answer_for_adjudication(answer: Answer, context: ReviewContext):
+    """Retain failed exhibits for mechanical checks; they are not accepted citations."""
+    _check_answer(answer, context, verify=False)
+
+
+def _check_review(review: Review, answer: Answer, context: ReviewContext, *, verify: bool):
     check_scope(review, context)
     if review.answer_id != answer.id:
         raise ValueError("Review must name the exact answer")
@@ -326,8 +341,17 @@ def check_review(review: Review, answer: Answer, context: ReviewContext):
             raise ValueError("Uninventoried issue must quote an exact title/body span")
         if issue.question_id is not None and issue.question_id not in questions:
             raise ValueError("Issue names an unknown brief question")
-        check_citations(issue.evidence_examined, context)
     check_coverage(review.coverage, claims, context)
+    if verify:
+        check_citations([c for i in review.issues for c in i.evidence_examined], context)
+
+
+def check_review(review: Review, answer: Answer, context: ReviewContext):
+    _check_review(review, answer, context, verify=True)
+
+
+def check_review_for_adjudication(review: Review, answer: Answer, context: ReviewContext):
+    _check_review(review, answer, context, verify=False)
 
 
 def check_response(response: IssueResponse, review: Review):
