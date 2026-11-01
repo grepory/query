@@ -382,7 +382,7 @@ def check_standing_ruling(ruling: Ruling, answer: Answer, context: ReviewContext
     """A saved ruling may outlive its original review, but not its exact claim scope."""
     check_scope(ruling, context)
     claim = next((c for c in answer.claims if c.id == ruling.claim_id), None)
-    if ruling.claim_id is None:
+    if ruling.claim_id is None or ruling.decision in {"narrow", "remove"}:
         matches = ruling.claim_text in answer.title or ruling.claim_text in answer.body_markdown
     else:
         matches = claim is not None and claim.text == ruling.claim_text
@@ -401,3 +401,30 @@ def check_applications(answer: Answer, rulings: tuple[Ruling, ...]):
             original.claim_text,
         ):
             raise ValueError("Applied edit must name a supplied ruling and exact original claim")
+
+
+def check_revision(
+    answer: Answer, review: Review, rulings: tuple[Ruling, ...], context: ReviewContext
+):
+    """Shared output checks for role clients and durable result commits."""
+    check_answer(answer, context)
+    check_applications(answer, rulings)
+    for response in answer.issue_responses:
+        check_response(response, review)
+    required = {i.id for i in review.issues if i.kind != "editorial"}
+    if not required <= {r.issue_id for r in answer.issue_responses}:
+        raise ValueError("Revision must respond to every non-editorial issue")
+    ruled = {
+        i.id
+        for i in review.issues
+        for r in rulings
+        if (i.claim_id, i.claim_text) == (r.claim_id, r.claim_text)
+    }
+    if any(
+        r.disposition == "applied_ruling" and r.issue_id not in ruled
+        for r in answer.issue_responses
+    ):
+        raise ValueError("Applied-ruling response requires a supplied ruling")
+    required_applications = {r.id for r in rulings if r.decision in {"narrow", "remove"}}
+    if not required_applications <= {a.ruling_id for a in answer.ruling_applications}:
+        raise ValueError("Binding edits must have explicit ruling-application records")

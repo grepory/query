@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from query.answer_loop import LoopState, ReviewedAnswer
 from query.evidence import EvidenceInput, EvidenceSnapshot, SourceVersion
 from query.investigation import Contract, Investigation
 
@@ -12,3 +13,6 @@ class InvestigationExport(Contract):
     evidence_inputs: tuple[EvidenceInput, ...]
     source_versions: tuple[SourceVersion, ...]
     snapshots: tuple[EvidenceSnapshot, ...]
+
+    answer_loop: LoopState | None = None
+    last_reviewed_answer: ReviewedAnswer | None = None

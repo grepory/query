@@ -83,7 +83,8 @@ For explicit lifecycle tests, `advance --to complete` accepts `--checks` with
 `CompletionChecks` JSON and `--outcome answered|qualified|unresolved`. Both checks
 must pass for the current brief from reviewing. These are caller-supplied
 attestations at the existing store boundary, not assessed completion or validation
-of the named answer. Actual model/review policy belongs to later tickets.
+of the named answer. Assessed research sufficiency belongs to NOT-42. The answer-loop policy is
+implemented in NOT-39, independently of these completion attestations.
 
 ## Audit export
 
@@ -94,8 +95,15 @@ versions), provenance observations, rejections, frozen snapshot observation keys
 and included/excluded passages. Rejected oversized text is not saved; its hash,
 size, limit and rejection remain.
 
-Current answer state and decisions live in caller-supplied step results,
-completion attestations and lifecycle events, all exported verbatim. There is no
-synthesized final answer or inferred sufficiency decision. Saved exact text and
-passage offsets let old snapshots resolve after subsequent imports. Exports are
-audit artifacts, not an import/restore format.
+The [durable answer loop](answer-loop.md) adds `answer_loop` and
+`last_reviewed_answer` fields. Current answers always pair the exact draft and
+its full review; pending drafts remain history. Historical reviewed answers retain
+their original snapshot/brief scope after evidence changes. There is no inferred
+research sufficiency decision. Saved exact text and passage offsets let old
+snapshots resolve after subsequent imports. Exports are audit artifacts, not an
+import/restore format.
+
+Use `advance --answer-models models.json [--call-limits limits.json]` to execute
+one explicit author/reviewer/adjudicator action from a ready snapshot in
+`reviewing`. See the answer-loop guide for configuration, conservative token
+admission, routing and recovery boundaries.

@@ -41,6 +41,7 @@ from query.review import (
     check_response,
     check_review,
     check_review_for_adjudication,
+    check_revision,
     check_ruling,
     check_scope,
     check_standing_ruling,
@@ -110,7 +111,7 @@ PROMPTS = {"author": AUTHOR, "reviewer": REVIEWER, "adjudicator": ADJUDICATOR}
 PROMPT_VERSIONS = {
     "author": "query-author-v1",
     "reviewer": "query-reviewer-v1",
-    "adjudicator": "query-adjudicator-v2",
+    "adjudicator": "query-adjudicator-v3",
 }
 
 
@@ -355,29 +356,9 @@ class ReviewClients:
             check_standing_ruling(ruling, previous, context)
 
         def validate(answer):
-            check_answer(answer, context)
-            check_applications(answer, rulings)
             if answer.id != answer_id:
                 raise ValueError("Revision must use the supplied new answer ID")
-            for response in answer.issue_responses:
-                check_response(response, review)
-            required = {i.id for i in review.issues if i.kind != "editorial"}
-            if not required <= {r.issue_id for r in answer.issue_responses}:
-                raise ValueError("Revision must respond to every non-editorial issue")
-            ruled = {
-                i.id
-                for i in review.issues
-                for r in rulings
-                if (i.claim_id, i.claim_text) == (r.claim_id, r.claim_text)
-            }
-            if any(
-                r.disposition == "applied_ruling" and r.issue_id not in ruled
-                for r in answer.issue_responses
-            ):
-                raise ValueError("Applied-ruling response requires a supplied ruling")
-            required_applications = {r.id for r in rulings if r.decision in {"narrow", "remove"}}
-            if not required_applications <= {a.ruling_id for a in answer.ruling_applications}:
-                raise ValueError("Binding edits must have explicit ruling-application records")
+            check_revision(answer, review, rulings, context)
 
         return self._call(
             "author",
@@ -460,6 +441,7 @@ class ReviewClients:
         issue_id: str,
         response: IssueResponse | None,
         *,
+        response_review: Review | None = None,
         passage_ids: tuple[UUID, ...] | None = None,
         omission_reason: str | None = None,
         reviewer_checks: tuple[EvidenceCheck, ...] | None = None,
@@ -476,9 +458,17 @@ class ReviewClients:
             raise ValueError("Adjudication requires one factual/inference issue")
         if response is not None:
             response = IssueResponse.model_validate(response.model_dump())
-            check_response(response, review)
-            if response.issue_id != issue_id:
-                raise ValueError("Author response belongs to a different issue")
+            if response_review is None:
+                check_response(response, review)
+                if response.issue_id != issue_id:
+                    raise ValueError("Author response belongs to a different issue")
+            else:
+                response_review = Review.model_validate(response_review.model_dump())
+                check_scope(response_review, context)
+                check_response(response, response_review)
+                old_issue = next(i for i in response_review.issues if i.id == response.issue_id)
+                if (old_issue.claim_id, old_issue.claim_text) != (issue.claim_id, issue.claim_text):
+                    raise ValueError("Prior defense must address the same exact claim")
         passages = context.passages()
         selected = (
             {UUID(p["passage_id"]) for p in passages} if passage_ids is None else set(passage_ids)
@@ -553,6 +543,9 @@ class ReviewClients:
                 else [],
                 "disputed_answer_span": issue.claim_text,
                 "author_response": response.model_dump(mode="json") if response else None,
+                "response_review": response_review.model_dump(mode="json")
+                if response_review
+                else None,
                 "reviewer_evidence": checks(reviewer_checks, issue.evidence_examined),
                 "author_evidence": checks(author_checks, response.evidence if response else ()),
                 "source_packet": [p for p in passages if UUID(p["passage_id"]) in selected],
