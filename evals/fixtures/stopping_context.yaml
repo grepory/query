@@ -1,0 +1,607 @@
+# Shared rubric, evidence, attempts, actions, and defaults for stopping_decisions.yaml.
+format_version: 1
+design_url: https://linear.app/nothanks-io/document/query-investigation-design-99eeebe4bfb0
+rubric_definition:
+  version: 1
+  evidence_and_scope:
+    zero: Invents evidence, confuses date or scope, or counts repetitions as independent.
+    one: Uses real evidence but omits a material scope, origin or uncertainty distinction.
+    two: Binds the argument to saved versions, dates, scope and upstream origins with explicit limits.
+  question_coverage:
+    zero: Deletes or ignores a required question or treats claim removal as completion.
+    one: Keeps the question but omits a material attempt, gap or unresolved reason.
+    two: Retains every requirement, distinguishes optional context and supports its disposition with history.
+  action_and_stop:
+    zero: No credible bounded action or supported stopping reason; false completion.
+    one: >-
+      Direction is reasonable but omits material consequence, feasibility, stop condition or challenge
+      disposition.
+    two: >-
+      Connects the material gap to a feasible bounded action, or supports exhaustion, unavailability,
+      clarification or limit with alternatives and separate checks.
+  fatal_errors:
+    invented_evidence_or_attempt: Invented source text, facts, or research attempts.
+    false_independence: Same-origin repetitions presented as independent corroboration.
+    unsupported_sufficiency: >-
+      Claims sufficient research with a material credible avenue open, treats an operational limit as
+      sufficiency, or declines a material new lead without support.
+    lost_required_question: Drops a required question, including after removal of its claim.
+    unreviewed_final_answer: Presents a pending revision as the current reviewed answer.
+    unbounded_or_unaffordable_action: >-
+      Admits work without bounded stopping conditions or sufficient allowance in its lane and lifetime
+      ceiling.
+briefs:
+  capacity:
+    question: As of 1 October 2026, how much Aster capacity is operational?
+    scope: >-
+      Prepared public-text investigation. Only synthetic saved text is available in this offline test;
+      proposed public acquisition actions are simulated.
+    cutoff: '2026-10-01'
+    questions:
+    - key: capacity
+      text: How much capacity is operational at the cutoff?
+      acceptance_criteria: Dated operational MW, separated from planned capacity, with supported limits.
+      required: true
+  future-date:
+    question: When will the remaining planned capacity be energized?
+    scope: >-
+      Prepared public-text investigation. Only synthetic saved text is available in this offline test;
+      proposed public acquisition actions are simulated.
+    cutoff: '2026-10-01'
+    questions:
+    - key: capacity
+      text: What is the energization date?
+      acceptance_criteria: A supported date or explicit unavailability after reasonable public avenues.
+      required: true
+  scope:
+    question: What is Aster capacity?
+    scope: >-
+      Prepared public-text investigation. Only synthetic saved text is available in this offline test;
+      proposed public acquisition actions are simulated.
+    cutoff: '2026-10-01'
+    questions:
+    - key: capacity
+      text: What does capacity mean for this request?
+      acceptance_criteria: >-
+        Ask the user to choose operational-only or total announced capacity before selecting the responsive
+        quantity.
+      required: true
+  removed-optional-claim-capacity:
+    question: As of 1 October 2026, how much Aster capacity is operational?
+    scope: >-
+      Prepared public-text investigation. Only synthetic saved text is available in this offline test;
+      proposed public acquisition actions are simulated.
+    cutoff: '2026-10-01'
+    questions:
+    - key: capacity
+      text: How much capacity is operational at the cutoff?
+      acceptance_criteria: Dated operational MW, separated from planned capacity, with supported limits.
+      required: true
+    - {key: optional-expansion, text: 'What is the future expansion date?', acceptance_criteria: Optional
+        context only., required: false}
+sources:
+  announcement:
+    reporting_origin: aster-announcement
+    text: >-
+      As of 1 October 2026, Aster reports 1200 MW total announced capacity: 900 MW operational and 300
+      MW planned, awaiting a grid connection.
+  ledger:
+    reporting_origin: commissioning-ledger
+    text: >-
+      The commissioning ledger records 900 MW operational on 1 October 2026; 300 MW remains planned pending
+      grid connection.
+  private:
+    reporting_origin: grid-filing
+    text: >-
+      The public grid filing reports 900 MW energized. The exact future energization date is confidential
+      and no public schedule is held.
+  reprint-0:
+    reporting_origin: aster-press-release-pr1
+    text: >-
+      Outlet 0 repeats Aster press release PR-1: 1200 MW total announced, comprising 900 MW operational
+      and 300 MW planned as of 1 October 2026.
+  reprint-1:
+    reporting_origin: aster-press-release-pr1
+    text: >-
+      Outlet 1 repeats Aster press release PR-1: 1200 MW total announced, comprising 900 MW operational
+      and 300 MW planned as of 1 October 2026.
+  reprint-2:
+    reporting_origin: aster-press-release-pr1
+    text: >-
+      Outlet 2 repeats Aster press release PR-1: 1200 MW total announced, comprising 900 MW operational
+      and 300 MW planned as of 1 October 2026.
+  reprint-3:
+    reporting_origin: aster-press-release-pr1
+    text: >-
+      Outlet 3 repeats Aster press release PR-1: 1200 MW total announced, comprising 900 MW operational
+      and 300 MW planned as of 1 October 2026.
+  reprint-4:
+    reporting_origin: aster-press-release-pr1
+    text: >-
+      Outlet 4 repeats Aster press release PR-1: 1200 MW total announced, comprising 900 MW operational
+      and 300 MW planned as of 1 October 2026.
+  reprint-5:
+    reporting_origin: aster-press-release-pr1
+    text: >-
+      Outlet 5 repeats Aster press release PR-1: 1200 MW total announced, comprising 900 MW operational
+      and 300 MW planned as of 1 October 2026.
+  reprint-6:
+    reporting_origin: aster-press-release-pr1
+    text: >-
+      Outlet 6 repeats Aster press release PR-1: 1200 MW total announced, comprising 900 MW operational
+      and 300 MW planned as of 1 October 2026.
+  reprint-7:
+    reporting_origin: aster-press-release-pr1
+    text: >-
+      Outlet 7 repeats Aster press release PR-1: 1200 MW total announced, comprising 900 MW operational
+      and 300 MW planned as of 1 October 2026.
+  reprint-8:
+    reporting_origin: aster-press-release-pr1
+    text: >-
+      Outlet 8 repeats Aster press release PR-1: 1200 MW total announced, comprising 900 MW operational
+      and 300 MW planned as of 1 October 2026.
+  reprint-9:
+    reporting_origin: aster-press-release-pr1
+    text: >-
+      Outlet 9 repeats Aster press release PR-1: 1200 MW total announced, comprising 900 MW operational
+      and 300 MW planned as of 1 October 2026.
+  old-scope:
+    reporting_origin: site-north-register
+    text: >-
+      On 1 September 2026, Aster Site North had 600 MW operational. This is a site total, not the company
+      total.
+  new-scope: {reporting_origin: company-register, text: 'On 1 October 2026, Aster reported 900 MW operational
+      across all sites.'}
+  unclear-scope:
+    reporting_origin: undated-filing
+    text: >-
+      Aster reported capacity of 900 MW; the filing does not identify the measurement date or whether
+      this includes planned capacity.
+attempts:
+  read-announcement:
+    id: read-announcement
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/announcement
+    result: evidence
+    used_tokens: 5
+    observed_progress: Recorded the dated operational figure, but commissioning detail remains unverified.
+    sources: [announcement]
+  read-ledger:
+    id: read-ledger
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/ledger
+    result: evidence
+    used_tokens: 5
+    observed_progress: Confirmed the dated quantity independently and resolved the only recorded material
+      gap.
+    sources: [ledger]
+  read-grid-filing:
+    id: read-grid-filing
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/private
+    result: evidence
+    used_tokens: 5
+    observed_progress: Public filing says the future date is confidential.
+    sources: [private]
+  public-register:
+    id: public-register
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/public-grid-register
+    result: unavailable
+    used_tokens: 5
+    observed_progress: Register contains no public schedule; the listed public avenue is exhausted.
+    sources: []
+  operator-request:
+    id: operator-request
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/operator-contact
+    result: unavailable
+    used_tokens: 5
+    observed_progress: Operator confirms the schedule is private; no available user source was identified.
+    sources: []
+  reprint-0:
+    id: reprint-0
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/reprint-0
+    result: evidence
+    used_tokens: 1
+    observed_progress: Same PR-1 origin; another outlet adds no independent corroboration.
+    sources: [reprint-0]
+  reprint-1:
+    id: reprint-1
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/reprint-1
+    result: evidence
+    used_tokens: 1
+    observed_progress: Same PR-1 origin; another outlet adds no independent corroboration.
+    sources: [reprint-1]
+  reprint-2:
+    id: reprint-2
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/reprint-2
+    result: evidence
+    used_tokens: 1
+    observed_progress: Same PR-1 origin; another outlet adds no independent corroboration.
+    sources: [reprint-2]
+  reprint-3:
+    id: reprint-3
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/reprint-3
+    result: evidence
+    used_tokens: 1
+    observed_progress: Same PR-1 origin; another outlet adds no independent corroboration.
+    sources: [reprint-3]
+  reprint-4:
+    id: reprint-4
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/reprint-4
+    result: evidence
+    used_tokens: 1
+    observed_progress: Same PR-1 origin; another outlet adds no independent corroboration.
+    sources: [reprint-4]
+  reprint-5:
+    id: reprint-5
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/reprint-5
+    result: evidence
+    used_tokens: 1
+    observed_progress: Same PR-1 origin; another outlet adds no independent corroboration.
+    sources: [reprint-5]
+  reprint-6:
+    id: reprint-6
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/reprint-6
+    result: evidence
+    used_tokens: 1
+    observed_progress: Same PR-1 origin; another outlet adds no independent corroboration.
+    sources: [reprint-6]
+  reprint-7:
+    id: reprint-7
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/reprint-7
+    result: evidence
+    used_tokens: 1
+    observed_progress: Same PR-1 origin; another outlet adds no independent corroboration.
+    sources: [reprint-7]
+  reprint-8:
+    id: reprint-8
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/reprint-8
+    result: evidence
+    used_tokens: 1
+    observed_progress: Same PR-1 origin; another outlet adds no independent corroboration.
+    sources: [reprint-8]
+  reprint-9:
+    id: reprint-9
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/reprint-9
+    result: evidence
+    used_tokens: 1
+    observed_progress: Same PR-1 origin; another outlet adds no independent corroboration.
+    sources: [reprint-9]
+  independent-request:
+    id: independent-request
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/ledger
+    result: unavailable
+    used_tokens: 5
+    observed_progress: No independent public ledger is accessible; the bounded independent avenue is exhausted.
+    sources: []
+  read-old-scope:
+    id: read-old-scope
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/old-scope
+    result: evidence
+    used_tokens: 5
+    observed_progress: Recorded the explicit date and site/company scope for comparison.
+    sources: [old-scope]
+  read-new-scope:
+    id: read-new-scope
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/new-scope
+    result: evidence
+    used_tokens: 5
+    observed_progress: Recorded the explicit date and site/company scope for comparison.
+    sources: [new-scope]
+  read-undated-filing:
+    id: read-undated-filing
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/unclear-scope
+    result: evidence
+    used_tokens: 5
+    observed_progress: The extra undated filing does not choose the user definition.
+    sources: [unclear-scope]
+  impossible-certainty-read-grid-filing:
+    id: read-grid-filing
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/private
+    result: evidence
+    used_tokens: 5
+    observed_progress: Recorded the known energized figure and private future schedule.
+    sources: [private]
+  public-register-check:
+    id: public-register-check
+    question_ids: [capacity]
+    method: inspect public register
+    target: https://fixtures.invalid/public-grid-register
+    result: unavailable
+    used_tokens: 5
+    observed_progress: >-
+      Register provides no additional operational-site record or lead beyond the supplied grid filing;
+      this bounded lookup is complete.
+    sources: []
+  operator-capacity-request:
+    id: operator-capacity-request
+    question_ids: [capacity]
+    method: request operator confirmation
+    target: https://fixtures.invalid/operator-contact
+    result: unavailable
+    used_tokens: 5
+    observed_progress: >-
+      Operator supplies no additional public site list or independent confirmation. This response cannot
+      establish a universal negative.
+    sources: []
+  query-1:
+    id: query-1
+    question_ids: [capacity]
+    method: search
+    target: Aster operational MW
+    result: no_change
+    used_tokens: 5
+    observed_progress: Returned the same press release; no new origin or resolved requirement.
+    sources: [announcement]
+  query-2:
+    id: query-2
+    question_ids: [capacity]
+    method: search
+    target: Aster energized megawatts
+    result: no_change
+    used_tokens: 5
+    observed_progress: Reworded query returned the same evidence and consumed another attempt.
+    sources: [announcement]
+  ledger-unavailable:
+    id: ledger-unavailable
+    question_ids: [capacity]
+    method: request commissioning ledger
+    target: https://fixtures.invalid/ledger
+    result: unavailable
+    used_tokens: 5
+    observed_progress: >-
+      The operator does not publish the commissioning ledger; the bounded request yielded no independent
+      operational confirmation.
+    sources: []
+  operator-confirmation-unavailable:
+    id: operator-confirmation-unavailable
+    question_ids: [capacity]
+    method: request operator confirmation
+    target: https://fixtures.invalid/operator-contact
+    result: unavailable
+    used_tokens: 5
+    observed_progress: >-
+      Operator points back to the announcement and provides no independent commissioning evidence or additional
+      public lead.
+    sources: []
+  removed-optional-claim-read-announcement:
+    id: read-announcement
+    question_ids: [capacity, optional-expansion]
+    method: read supplied text
+    target: https://fixtures.invalid/announcement
+    result: evidence
+    used_tokens: 5
+    observed_progress: Recorded the dated operational figure, but commissioning detail remains unverified.
+    sources: [announcement]
+  removed-optional-claim-read-ledger:
+    id: read-ledger
+    question_ids: [capacity]
+    method: read supplied text
+    target: https://fixtures.invalid/ledger
+    result: evidence
+    used_tokens: 5
+    observed_progress: Independently confirmed required operational quantity and resolved the declared
+      material avenue.
+    sources: [ledger]
+actions:
+  read-ledger:
+    id: read-ledger
+    question_ids: [capacity]
+    kind: fetch
+    missing_evidence: An unread commissioning ledger may confirm the operational figure.
+    consequence: The operational total or its qualification could change.
+    next_action: Read the synthetic commissioning ledger primary-source lead.
+    stop_condition: Stop this avenue after one bounded fetch and assessment, or record why unavailable.
+    estimated_tokens: 20
+    availability: available
+    lane: research
+  primary-read-and-settled-read-ledger:
+    id: read-ledger
+    question_ids: [capacity]
+    kind: fetch
+    missing_evidence: An unread commissioning ledger may confirm the operational figure.
+    consequence: The operational total or its qualification could change.
+    next_action: Read the synthetic commissioning ledger primary-source lead.
+    stop_condition: Stop this avenue after one bounded fetch and assessment, or record why unavailable.
+    estimated_tokens: 20
+    availability: exhausted
+    lane: research
+  private-schedule:
+    id: private-schedule
+    question_ids: [capacity]
+    kind: fetch
+    missing_evidence: The decisive energization schedule is private.
+    consequence: A supplied schedule could resolve or qualify the requested energization date.
+    next_action: Obtain an unavailable private schedule.
+    stop_condition: Do not repeat exhausted public requests without a new lead.
+    estimated_tokens: 20
+    availability: unavailable
+    lane: research
+  ask-schedule:
+    id: ask-schedule
+    question_ids: [capacity]
+    kind: ask_user
+    missing_evidence: The user can supply the decisive signed schedule.
+    consequence: A supplied schedule could resolve or qualify the requested energization date.
+    next_action: Ask the user for the schedule and permitted scope of use.
+    stop_condition: Wait for the user document; do not guess its contents.
+    estimated_tokens: 0
+    availability: available
+    lane: review
+  independent-ledger:
+    id: independent-ledger
+    question_ids: [capacity]
+    kind: fetch
+    missing_evidence: Ten outlets share one press-release origin; independent commissioning support is
+      missing.
+    consequence: The operational total or its qualification could change.
+    next_action: Read a bounded independent commissioning-register lead.
+    stop_condition: Stop this avenue after one bounded fetch and assessment, or record why unavailable.
+    estimated_tokens: 20
+    availability: available
+    lane: research
+  circular-no-independent-avenue-independent-ledger:
+    id: independent-ledger
+    question_ids: [capacity]
+    kind: fetch
+    missing_evidence: Ten outlets share one press-release origin; independent commissioning support is
+      missing.
+    consequence: The operational total or its qualification could change.
+    next_action: Read a bounded independent commissioning-register lead.
+    stop_condition: Stop this avenue after one bounded fetch and assessment, or record why unavailable.
+    estimated_tokens: 20
+    availability: exhausted
+    lane: research
+  reconcile-scope:
+    id: reconcile-scope
+    question_ids: [capacity]
+    kind: reconcile
+    missing_evidence: 'No new evidence is missing: the two numbers have different dates and scopes.'
+    consequence: The draft invents a decline by conflating site and company totals.
+    next_action: Correct the draft using September site vs October company scope.
+    stop_condition: Review the full corrected draft; fetch only if a material ambiguity remains.
+    estimated_tokens: 5
+    availability: available
+    lane: review
+  ask-definition:
+    id: ask-definition
+    question_ids: [capacity]
+    kind: ask_user
+    missing_evidence: The user definition changes whether 900 MW operational or 1200 MW total announced
+      is responsive.
+    consequence: The operational total or its qualification could change.
+    next_action: Ask whether the requirement is operational-only or total announced capacity.
+    stop_condition: Wait for a versioned user clarification.
+    estimated_tokens: 0
+    availability: available
+    lane: review
+  new-grid-register:
+    id: new-grid-register
+    question_ids: [capacity]
+    kind: fetch
+    missing_evidence: A newly identified register may disclose another energized site.
+    consequence: The operational total or its qualification could change.
+    next_action: Read the concrete register once and assess additional operational capacity.
+    stop_condition: Stop this avenue after one bounded fetch and assessment, or record why unavailable.
+    estimated_tokens: 20
+    availability: available
+    lane: research
+  costly-commissioning-check:
+    id: costly-commissioning-check
+    question_ids: [capacity]
+    kind: fetch
+    missing_evidence: A commissioning record may reverse the main operational-capacity conclusion.
+    consequence: The operational total or its qualification could change.
+    next_action: Read the synthetic commissioning ledger primary-source lead.
+    stop_condition: Stop this avenue after one bounded fetch and assessment, or record why unavailable.
+    estimated_tokens: 60
+    availability: available
+    lane: research
+  final-review:
+    id: final-review
+    question_ids: [capacity]
+    kind: review
+    missing_evidence: The pending qualification has not received final review.
+    consequence: The pending revised answer cannot become the current reviewed answer.
+    next_action: Fully review pending-answer-2 against the frozen snapshot after an explicit allowance
+      grant.
+    stop_condition: If the bounded final review cannot fit, park and retain answer-1 as the last reviewed
+      answer.
+    estimated_tokens: 20
+    availability: available
+    lane: review
+  repeat-query:
+    id: repeat-query
+    question_ids: [capacity]
+    kind: search
+    missing_evidence: No new lead or method has been supplied.
+    consequence: The operational total or its qualification could change.
+    next_action: Reword the same exhausted query again.
+    stop_condition: Do not admit without a changed method, new lead, or retryable failure.
+    estimated_tokens: 20
+    availability: exhausted
+    lane: research
+  new-register-method:
+    id: new-register-method
+    question_ids: [capacity]
+    kind: fetch
+    missing_evidence: A commissioning register can independently resolve operational status.
+    consequence: The operational total or its qualification could change.
+    next_action: Inspect the new primary commissioning register, bounded to one request.
+    stop_condition: Stop this avenue after one bounded fetch and assessment, or record why unavailable.
+    estimated_tokens: 20
+    availability: available
+    lane: research
+defaults:
+  brief: capacity
+  sources: [announcement]
+  questions:
+  - question_id: capacity
+    state: open
+    sources: [announcement]
+    attempts: [read-announcement]
+  attempts: [read-announcement]
+  claims:
+  - {id: capacity-claim, question_id: capacity, text: Aster reports 900 MW operational; commissioning
+      support remains incomplete.}
+  removed_claims: []
+  answer_ref: answer-1
+  last_reviewed_answer_ref: answer-1
+  reviewer_challenge: null
+  checkpoint:
+    phase: reviewing
+    brief_version: 1
+    budget:
+      limits: {research: 100, review: 100, total: 200}
+      research_spent: 30
+      review_spent: 10
+expected_defaults:
+  retained_question_ids: [capacity]
+  required_records:
+  - Brief and snapshot identity; affected required question capacity.
+  - Candidate alternatives, selected or declined actions, allowance, and stopping rationale.
+  forbidden:
+  - Treating operational limits as sufficient research.
+  - Inventing source text, completed attempts, or independent origins.
+  - Dropping a required question when its claim is removed.
+  selected_action_ids: []
+  preserved_action_ids: []
+  reason: null
+  outcome: null

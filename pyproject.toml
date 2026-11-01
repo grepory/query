@@ -17,7 +17,12 @@ dependencies = [
 query = "query.cli:main"
 
 [dependency-groups]
-dev = ["pytest", "pytest-socket", "ruff"]
+dev = [
+    "pytest",
+    "pytest-socket",
+    "pyyaml>=6,<7",
+    "ruff",
+]
 
 [build-system]
 requires = ["hatchling"]

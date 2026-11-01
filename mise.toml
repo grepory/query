@@ -24,7 +24,15 @@ run = "uv run --locked pytest"
 
 [tasks.check]
 description = "Run all CI checks"
-depends = ["lint", "test"]
+depends = ["lint", "test", "fixtures:check"]
+
+[tasks."fixtures:stopping"]
+description = "Generate stopping-decision JSON from compact YAML"
+run = "uv run --locked python -m evals.generate_stopping generate"
+
+[tasks."fixtures:check"]
+description = "Reject stale generated stopping fixtures"
+run = "uv run --locked python -m evals.generate_stopping check"
 
 [tasks."eval:smoke"]
 description = "Explicit real-model smoke eval; forbidden in CI"
