@@ -37,9 +37,10 @@ Optional call-limits JSON contains `max_output_tokens`, `max_prompt_bytes`, and
 paid operation, the controller reserves prompt-byte cap plus output-token cap
 against the existing review and total token allowances. This deliberately
 conservative admission bound may require a larger allowance than actual usage.
-Actual reported input/output tokens are charged on commit. NOT-40 adds detailed
-reserve/pricing, closeout and operational recovery; these token bounds are not a
-dollar budget or a reservation for a future final review.
+The input estimate includes schema/provider framing. NOT-40 additionally protects
+binding edits and final full review, records attempt usage and handles closeout,
+ownership and failure holds; see [review-recovery.md](review-recovery.md). These
+token bounds are not a dollar budget.
 
 Inspect after each action to obtain the next revision. The returned `LoopState`
 contains `next_operation`, typed history, current reviewed answer and routing
@@ -100,12 +101,12 @@ drafts. Consumers must use the reviewed pair fields for displayed answers rather
 than selecting the last author result. New evidence retains historical rulings
 but cannot suppress new-snapshot objections.
 
-Role failures propagate and retain the pending intent. A caller may explicitly
-advance it again after inspection, possibly repeating a remotely successful call
-whose local commit was lost. Exactly-once remote billing is not promised. No retry
-scheduler, executor lease, closeout mode or automatic failure classification into
-lifecycle holds is added here (NOT-40). Use a serial executor; existing revision
-checks guard stale local decisions but are not a provider-call ownership lease.
+Provider failures pause or park while preserving the intent; unknown remote
+outcomes require a conservative reconciliation and explicit resume before retry.
+A PostgreSQL session lock prevents competing local executors, with ownership
+revalidated before paid I/O and result commit. Remote calls already in flight
+remain subject to outcome/billing uncertainty. See the recovery guide for retry
+times, lifetime ceilings, reserve and per-attempt accounting.
 
 ## Regression provenance
 
@@ -116,4 +117,4 @@ is in [review-invariants.md](review-invariants.md). These tests execute the actu
 controller/store with fake clients and an end-to-end Pydantic AI `FunctionModel`
 loop. Provider calls never run in CI. Additional cases cover historical visibility,
 pinned model identities, invalid result commits, failure/restart, and independent
-adjudication commits. NOT-40/47/50 retain their documented fixture boundaries.
+adjudication commits. NOT-40 adds the recovery regressions; NOT-47/50 retain their documented boundaries.

@@ -14,6 +14,13 @@ from query.investigation import (
     StepResult,
     StepStatus,
 )
+from query.recovery import (
+    ReviewPolicy,
+    admission_reserve,
+    in_closeout,
+    review_attempts,
+    saved_policy,
+)
 from query.review import (
     Answer,
     Issue,
@@ -25,7 +32,13 @@ from query.review import (
     check_revision,
     check_ruling,
 )
-from query.review_clients import PROMPT_VERSIONS, CallLimits, ModelCall, ReviewClients
+from query.review_clients import (
+    PROMPT_VERSIONS,
+    CallLimits,
+    ModelCall,
+    ReviewClients,
+    RoleCallError,
+)
 
 KIND = "answer_loop"
 Action = Literal["write", "review", "revise", "adjudicate", "carry_forward"]
@@ -43,6 +56,7 @@ class Operation(Contract):
     review_id: UUID | None = None
     issue_id: str | None = None
     ruling_ids: tuple[UUID, ...] = ()
+    closeout: bool = False
 
     @property
     def key(self):
@@ -136,6 +150,8 @@ class LoopState(Contract):
     answers: tuple[Answer, ...]
     reviews: tuple[Review, ...]
     rulings: tuple[Ruling, ...]
+    lifecycle_phase: Phase | None = None
+    closeout: bool = False
 
 
 def identity(answer: Answer, issue: Issue):
@@ -213,7 +229,7 @@ def last_reviewed(steps):
     return visible
 
 
-def reconstruct(context: ReviewContext, steps) -> LoopState:
+def reconstruct(context: ReviewContext, steps, *, closeout=False) -> LoopState:
     snapshot = context.evidence.snapshot
     answers, reviews, rulings = [], [], []
     count = 0
@@ -264,6 +280,7 @@ def reconstruct(context: ReviewContext, steps) -> LoopState:
                 sequence=count,
                 action=action,
                 output_id=uuid5(snapshot.id, f"{count}/{action}"),
+                closeout=closeout,
                 **refs,
             )
         return LoopState(**base, status=status, reason=reason, next_operation=op)
@@ -309,7 +326,7 @@ def reconstruct(context: ReviewContext, steps) -> LoopState:
         already = any(
             (r.claim_id, r.claim_text) == (issue.claim_id, issue.claim_text) for r in active
         )
-        if response is not None and not already:
+        if (response is not None or closeout) and not already:
             return result(
                 "working",
                 "Repeated exact claim dispute",
@@ -416,41 +433,85 @@ def carry_forward(operation: Operation, answer: Answer):
 class AnswerController:
     """One committed action per advance; no autonomous research or retry loop."""
 
-    def __init__(self, store, clients: ReviewClients):
-        self.store, self.clients = store, clients
+    def __init__(self, store, clients: ReviewClients, *, policy: ReviewPolicy | None = None):
+        self.store, self.clients, self.policy = store, clients, policy
 
     def advance(self, identifier: UUID, expected_revision: int):
-        current, context, state = self.store.answer_state(identifier)
-        from query.store import StaleRevision
+        with self.store.answer_owner(identifier, expected_revision):
+            return self._advance(identifier)
 
-        if current.revision != expected_revision:
-            raise StaleRevision(
-                f"Expected revision {expected_revision}; current revision is {current.revision}"
-            )
+    def _advance(self, identifier):
+        current, context, state = self.store.answer_state(identifier)
+        if any(a.state == "started" for a in review_attempts(current)):
+            self.store.reconcile_answer_attempt(identifier)
+            return self.store.answer_state(identifier)[2]
         if current.checkpoint.phase != Phase.REVIEWING:
             raise ValueError(
                 "Answer-loop execution requires reviewing; explicitly resume held work"
             )
-        op = state.next_operation
-        if op is None:
+        if state.next_operation is None:
             return state
-        # Existing step admission provides the token ceiling. Detailed reserve/pricing is NOT-40.
-        reserve = (
-            self.clients.limits.max_prompt_bytes + self.clients.limits.max_output_tokens
-            if op.action != "carry_forward"
-            else 1
+        policy = saved_policy(current, state.snapshot_id) or self.policy or ReviewPolicy()
+        if self.policy is not None and policy != self.policy:
+            raise ValueError("Review policy is pinned for the snapshot answer loop")
+        if saved_policy(current, state.snapshot_id) is None:
+            self.store.configure_review(identifier, current.revision, state.snapshot_id, policy)
+            current, context, state = self.store.answer_state(identifier)
+        bound = self.clients.limits.max_prompt_bytes + self.clients.limits.max_output_tokens
+        remaining = current.checkpoint.budget.remaining(Lane.REVIEW)
+        threshold = policy.closeout_remaining_tokens
+        if threshold is None:
+            threshold = 3 * bound
+        # Never rewrite an already planned operation when entering closeout.
+        pending = next((s for s in current.steps if s.result is None), None)
+        if (
+            pending is None
+            and state.reviews
+            and remaining <= threshold
+            and not in_closeout(current, state.snapshot_id)
+        ):
+            self.store.enter_closeout(identifier, current.revision, state.snapshot_id)
+            current, context, state = self.store.answer_state(identifier)
+        op = state.next_operation
+        last_paid = next(
+            (
+                s.result.used_tokens
+                for s in reversed(current.steps)
+                if s.request.kind == KIND
+                and s.result is not None
+                and s.request.inputs["operation"]["action"] in {"write", "revise"}
+                and s.result.used_tokens > 0
+            ),
+            0,
         )
+        reserve = admission_reserve(op, bound, last_paid)
+        if remaining < reserve:
+            self.store.park_review_limit(identifier, current.revision, reserve)
+            return self.store.answer_state(identifier)[2]
         execution = execution_for(self.clients, op.action) if op.action != "carry_forward" else None
+        inputs = {
+            "operation": op.model_dump(mode="json"),
+            "execution": execution.model_dump(mode="json") if execution else None,
+        }
         request = StepRequest(
             key=op.key,
             kind=KIND,
             lane=Lane.REVIEW,
-            reserved_tokens=reserve,
-            inputs={
-                "operation": op.model_dump(mode="json"),
-                "execution": execution.model_dump(mode="json") if execution else None,
-            },
+            reserved_tokens=bound if execution else 1,
+            inputs=inputs,
         )
+        if pending is not None:
+            if (
+                Operation.model_validate(pending.request.inputs["operation"]) != op
+                or (
+                    Execution.model_validate(pending.request.inputs["execution"])
+                    if pending.request.inputs["execution"] is not None
+                    else None
+                )
+                != execution
+            ):
+                raise ValueError("Operation key already belongs to different work")
+            request = pending.request
         planned = self.store.plan_step(identifier, current.revision, request)
         answer = state.answers[-1] if state.answers else None
         review = state.reviews[-1] if state.reviews else None
@@ -461,31 +522,46 @@ class AnswerController:
                 used_tokens=0,
                 output={"answer": carry_forward(op, answer).model_dump(mode="json")},
             )
+            self.store.finish_step(identifier, planned.revision, op.key, result)
         else:
-            if op.action == "write":
-                call = self.clients.write(context, op.output_id)
-            elif op.action == "review":
-                call = self.clients.review(
-                    context, op.output_id, answer, previous_review=review, rulings=supplied
+            attempt = self.store.begin_answer_attempt(identifier, planned.revision, op.key, policy)
+            try:
+                if not self.store.authorize_answer_attempt(identifier, attempt.id):
+                    return self.store.answer_state(identifier)[2]
+                if op.action == "write":
+                    call = self.clients.write(context, op.output_id)
+                elif op.action == "review":
+                    call = self.clients.review(
+                        context, op.output_id, answer, previous_review=review, rulings=supplied
+                    )
+                elif op.action == "revise":
+                    call = self.clients.revise(
+                        context,
+                        op.output_id,
+                        answer,
+                        review,
+                        rulings=supplied,
+                        closeout=op.closeout,
+                    )
+                else:
+                    issue = next(i for i in review.issues if i.id == op.issue_id)
+                    response, response_review = prior_response(state, issue)
+                    call = self.clients.adjudicate(
+                        context,
+                        op.output_id,
+                        answer,
+                        review,
+                        issue.id,
+                        response,
+                        response_review=response_review,
+                    )
+                result = StepResult(
+                    status=StepStatus.SUCCEEDED,
+                    used_tokens=call.usage.input_tokens + call.usage.output_tokens,
+                    output={"call": call.model_dump(mode="json")},
                 )
-            elif op.action == "revise":
-                call = self.clients.revise(context, op.output_id, answer, review, rulings=supplied)
-            else:
-                issue = next(i for i in review.issues if i.id == op.issue_id)
-                response, response_review = prior_response(state, issue)
-                call = self.clients.adjudicate(
-                    context,
-                    op.output_id,
-                    answer,
-                    review,
-                    issue.id,
-                    response,
-                    response_review=response_review,
-                )
-            result = StepResult(
-                status=StepStatus.SUCCEEDED,
-                used_tokens=call.usage.input_tokens + call.usage.output_tokens,
-                output={"call": call.model_dump(mode="json")},
-            )
-        self.store.finish_step(identifier, planned.revision, op.key, result)
+            except RoleCallError as error:
+                self.store.fail_answer_attempt(identifier, attempt.id, error)
+                return self.store.answer_state(identifier)[2]
+            self.store.finish_step(identifier, None, op.key, result, attempt_id=attempt.id)
         return self.store.answer_state(identifier)[2]

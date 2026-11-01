@@ -77,7 +77,8 @@ starting a different operation or changing phase.
 
 Held work requires explicit resume. Limit stops resume in planning; move back to
 reviewing for pending review-lane fixtures. Complete/canceled work stays terminal.
-This local simulation does not implement provider execution ownership (NOT-40).
+Fixture steps remain simulations. Actual answer-loop actions use NOT-40 provider
+execution ownership and preserve a reviewing resume target on review limit stops.
 
 For explicit lifecycle tests, `advance --to complete` accepts `--checks` with
 `CompletionChecks` JSON and `--outcome answered|qualified|unresolved`. Both checks
@@ -107,3 +108,11 @@ Use `advance --answer-models models.json [--call-limits limits.json]` to execute
 one explicit author/reviewer/adjudicator action from a ready snapshot in
 `reviewing`. See the answer-loop guide for configuration, conservative token
 admission, routing and recovery boundaries.
+
+For review recovery, `create --lifetime-tokens N` optionally separates the initial
+total allowance from its immutable lifetime ceiling. Without it, initial total is
+the ceiling. `advance --review-policy policy.json` pins closeout thresholds, retry
+delay and optional explicit pricing assumptions for the snapshot. Transient
+failures pause until a due-time `resume`; permanent failures and insufficient
+reserve park. See [review-recovery.md](review-recovery.md) for accounting and
+uncertain remote-call recovery. No background retries are installed.

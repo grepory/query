@@ -20,9 +20,11 @@ should port a helper only when their concrete implementation needs it.
 
 `mise run check` checks corpus parsing, valid references, identity uniqueness,
 budget values, saved-result links, reviewed output references, and failure cases
-for malformed histories. It does **not** prove the future review actions work.
-There is no alternate review controller, fake policy engine, skipped controller
-test, or xfail standing in for NOT-39/40.
+for malformed histories. The real NOT-39 controller/store tests and NOT-40
+recovery tests now materialize the relevant histories and assert actual actions,
+commits, visibility, ownership and cumulative usage. Fixture parsing alone does
+not prove an action works; there are no skipped controller tests or xfails
+standing in for implementation.
 
 The test-only schema in `tests/review_cases.py` describes fixture records, not
 proposed production schemas. Local IDs such as `d1`, `v1`, and `s1` are readable

@@ -24,6 +24,7 @@ from query.investigation import (
     StepRequest,
     StepResult,
 )
+from query.recovery import ReviewPolicy
 from query.review_clients import CallLimits, ReviewClients, ReviewModels, RoleCallError
 from query.store import InvestigationStore, StaleRevision
 
@@ -47,6 +48,9 @@ def parser() -> argparse.ArgumentParser:
     )
     create.add_argument("--brief", type=Path, required=True)
     create.add_argument("--limits", type=Path, required=True)
+    create.add_argument(
+        "--lifetime-tokens", type=int, help="Immutable lifetime ceiling; default is initial total"
+    )
     help_text = {
         "inspect": "Read checkpoint, step results and decision history",
         "export": "Export lifecycle and exact saved evidence as audit JSON",
@@ -84,6 +88,9 @@ def parser() -> argparse.ArgumentParser:
                 help="Execute one answer-loop action using explicit ReviewModels JSON",
             )
             cmd.add_argument("--call-limits", type=Path, help="Optional bounded CallLimits JSON")
+            cmd.add_argument(
+                "--review-policy", type=Path, help="Optional ReviewPolicy JSON, pinned per snapshot"
+            )
             cmd.add_argument("--reason")
             cmd.add_argument("--checks", type=Path, help="Caller-supplied CompletionChecks JSON")
             cmd.add_argument("--outcome", choices=[o.value for o in Outcome])
@@ -127,7 +134,11 @@ def run_fixture(store: InvestigationStore, args) -> Investigation:
 
 def execute(store: InvestigationStore, args):
     if args.command == "create":
-        return store.create(read_json(args.brief, Brief), read_json(args.limits, Limits))
+        return store.create(
+            read_json(args.brief, Brief),
+            read_json(args.limits, Limits),
+            lifetime_tokens=args.lifetime_tokens,
+        )
     if args.command == "inspect":
         return store.load(args.id)
     if args.command == "export":
@@ -169,9 +180,13 @@ def execute(store: InvestigationStore, args):
             read_json(args.answer_models, ReviewModels),
             limits=read_json(args.call_limits, CallLimits) if args.call_limits else None,
         )
-        return AnswerController(store, clients).advance(args.id, args.revision)
-    if args.call_limits:
-        raise ValueError("--call-limits requires --answer-models")
+        return AnswerController(
+            store,
+            clients,
+            policy=read_json(args.review_policy, ReviewPolicy) if args.review_policy else None,
+        ).advance(args.id, args.revision)
+    if args.call_limits or args.review_policy:
+        raise ValueError("--call-limits and --review-policy require --answer-models")
     if args.fixture:
         if args.reason or args.checks or args.outcome:
             raise ValueError("--reason, --checks and --outcome require --to, not --fixture")

@@ -1,13 +1,19 @@
 """Transactional investigation storage; no model calls or workflow execution."""
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+from datetime import timedelta
+from hashlib import blake2b
 from uuid import UUID, uuid4
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import func, insert, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.exc import SQLAlchemyError
 
 from query import db
 from query.answer_loop import (
+    CALL,
     KIND,
     Execution,
     Operation,
@@ -49,6 +55,13 @@ from query.investigation import (
     StepResult,
     transition,
 )
+from query.recovery import (
+    ReviewAttempt,
+    admission_reserve,
+    in_closeout,
+    review_attempts,
+    saved_policy,
+)
 from query.review import ReviewContext
 
 
@@ -57,10 +70,70 @@ class StaleRevision(ValueError):
 
 
 class InvestigationStore:
-    def __init__(self, engine: Engine):
+    def __init__(self, engine: Engine, *, clock=None):
         self.engine = engine
+        self.clock = clock
+        self._owner = ContextVar("query_review_owner", default=None)
 
-    def create(self, brief: Brief, limits: Limits) -> Investigation:
+    def _now(self, conn):
+        return self.clock() if self.clock else conn.scalar(select(func.clock_timestamp()))
+
+    @contextmanager
+    def answer_owner(self, identifier, expected_revision):
+        key = int.from_bytes(
+            blake2b(f"query:review:{identifier}".encode(), digest_size=8).digest(), signed=True
+        )
+        with self.engine.connect() as conn:
+            if not conn.scalar(select(func.pg_try_advisory_lock(key))):
+                raise ValueError("Another executor owns this investigation")
+            conn.commit()
+            pid = conn.scalar(select(func.pg_backend_pid()))
+            conn.commit()
+            token = self._owner.set((identifier, conn, pid, key))
+            try:
+                self.load_revision(identifier, expected_revision)
+                yield
+            finally:
+                self._owner.reset(token)
+                if not conn.closed and not conn.invalidated:
+                    try:
+                        conn.execute(select(func.pg_advisory_unlock(key)))
+                        conn.commit()
+                    except SQLAlchemyError:
+                        conn.invalidate()
+
+    def load_revision(self, identifier, expected_revision):
+        with self.engine.begin() as conn:
+            self._lock(conn, identifier, expected_revision, read=True)
+
+    def _require_owner(self, identifier):
+        owner = self._owner.get()
+        if owner is None or owner[0] != identifier:
+            raise ValueError("Answer attempts require execution ownership")
+        _, conn, pid, key = owner
+        if conn.closed or conn.invalidated:
+            raise ValueError("Execution ownership connection was lost")
+        try:
+            held = conn.scalar(
+                text(
+                    "SELECT pg_backend_pid() = :pid AND EXISTS ("
+                    "SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = :pid "
+                    "AND classid::bigint = :high AND objid::bigint = :low "
+                    "AND objsubid = 1 AND granted)"
+                ),
+                {"pid": pid, "high": (key & ((1 << 64) - 1)) >> 32, "low": key & ((1 << 32) - 1)},
+            )
+            conn.commit()
+        except SQLAlchemyError:
+            conn.invalidate()
+            raise
+        if not held:
+            raise ValueError("Execution ownership was lost")
+
+    def create(self, brief: Brief, limits: Limits, *, lifetime_tokens=None) -> Investigation:
+        ceiling = limits.total if lifetime_tokens is None else lifetime_tokens
+        if type(ceiling) is not int or ceiling < limits.total:
+            raise ValueError("Lifetime token ceiling must cover the initial total allowance")
         identifier = uuid4()
         checkpoint = Checkpoint(budget=Budget(limits=limits))
         with self.engine.begin() as conn:
@@ -83,7 +156,7 @@ class InvestigationStore:
                     investigation_id=identifier,
                     revision=1,
                     kind="created",
-                    details={},
+                    details={"lifetime_tokens": ceiling},
                 )
             )
             return self._read(conn, identifier)
@@ -120,6 +193,7 @@ class InvestigationStore:
             return InvestigationExport(
                 investigation=investigation,
                 last_reviewed_answer=last_reviewed(investigation.steps),
+                review_attempts=review_attempts(investigation),
                 evidence_inputs=observations,
                 source_versions=tuple(self._read_source_version(conn, v) for v in version_ids),
                 snapshots=snapshots,
@@ -153,7 +227,227 @@ class InvestigationStore:
         context = ReviewContext(
             brief=current.briefs[-1], evidence=self._read_snapshot(conn, snapshot_id)
         )
-        return current, context, reconstruct(context, current.steps)
+        state = reconstruct(context, current.steps, closeout=in_closeout(current, snapshot_id))
+        return (
+            current,
+            context,
+            state.model_copy(
+                update={
+                    "lifecycle_phase": current.checkpoint.phase,
+                    "closeout": in_closeout(current, snapshot_id),
+                }
+            ),
+        )
+
+    def configure_review(self, identifier, expected_revision, snapshot_id, policy):
+        self._require_owner(identifier)
+        with self.engine.begin() as conn:
+            row, checkpoint = self._lock(conn, identifier, expected_revision)
+            current, _, state = self._answer_state(conn, identifier)
+            if state.snapshot_id != snapshot_id or saved_policy(current, snapshot_id) is not None:
+                raise ValueError("Review policy must be saved once for the current snapshot")
+            return self._save(
+                conn,
+                row,
+                checkpoint,
+                "review_policy",
+                {"snapshot_id": str(snapshot_id), "policy": policy.model_dump(mode="json")},
+            )
+
+    def enter_closeout(self, identifier, expected_revision, snapshot_id):
+        self._require_owner(identifier)
+        with self.engine.begin() as conn:
+            row, checkpoint = self._lock(conn, identifier, expected_revision)
+            self._require_no_pending(conn, identifier)
+            current, _, state = self._answer_state(conn, identifier)
+            if checkpoint.phase != Phase.REVIEWING or state.snapshot_id != snapshot_id:
+                raise ValueError("Closeout requires the active review snapshot")
+            if in_closeout(current, snapshot_id):
+                return current
+            return self._save(
+                conn, row, checkpoint, "review_closeout", {"snapshot_id": str(snapshot_id)}
+            )
+
+    def park_review_limit(self, identifier, expected_revision, required):
+        self._require_owner(identifier)
+        with self.engine.begin() as conn:
+            row, checkpoint = self._lock(conn, identifier, expected_revision)
+            held = transition(checkpoint, Phase.PARKED, reason="review_reserve")
+            return self._save(conn, row, held, "review_limit", {"required_tokens": required})
+
+    def begin_answer_attempt(self, identifier, expected_revision, key, policy):
+        self._require_owner(identifier)
+        with self.engine.begin() as conn:
+            row, checkpoint = self._lock(conn, identifier, expected_revision)
+            current, _, state = self._answer_state(conn, identifier)
+            step = self._step(conn, identifier, key)
+            if (
+                checkpoint.phase != Phase.REVIEWING
+                or step is None
+                or step.result is not None
+                or key != state.next_operation.key
+            ):
+                raise ValueError("Attempt must use the active pending answer operation")
+            if saved_policy(current, state.snapshot_id) != policy:
+                raise ValueError("Attempt must use the saved review policy")
+            execution = Execution.model_validate(step.request.inputs["execution"])
+            bound = execution.limits.max_prompt_bytes + execution.limits.max_output_tokens
+            last_paid = next(
+                (
+                    s.result.used_tokens
+                    for s in reversed(current.steps)
+                    if s.request.kind == KIND
+                    and s.result is not None
+                    and s.request.inputs["operation"]["action"] in {"write", "revise"}
+                    and s.result.used_tokens > 0
+                ),
+                0,
+            )
+            if checkpoint.budget.remaining(Lane.REVIEW) < admission_reserve(
+                state.next_operation, bound, last_paid
+            ):
+                raise ValueError("Attempt exceeds the protected final-review reserve")
+            history = review_attempts(current)
+            if any(a.state == "started" for a in history):
+                raise ValueError("Reconcile the uncertain attempt before retrying")
+            prior = [a for a in history if a.key == key]
+            now = self._now(conn)
+            if prior and prior[-1].retry_at is not None and prior[-1].retry_at > now:
+                raise ValueError("Retry is not due yet")
+            attempt = ReviewAttempt(
+                id=uuid4(),
+                key=key,
+                number=len(prior) + 1,
+                state="started",
+                started_at=now,
+                prices=policy.prices.get(step.request.inputs["execution"]["role"]),
+            )
+            self._save(
+                conn,
+                row,
+                checkpoint,
+                "review_attempt_started",
+                {"review_attempt": attempt.model_dump(mode="json")},
+            )
+            return attempt
+
+    def authorize_answer_attempt(self, identifier, attempt_id):
+        with self.engine.begin() as conn:
+            row, checkpoint = self._lock(conn, identifier)
+            attempt = self._pending_attempt(conn, identifier, attempt_id)
+            if checkpoint.phase != Phase.REVIEWING:
+                self._failed_attempt(
+                    conn,
+                    row,
+                    checkpoint,
+                    attempt,
+                    kind="stale_execution",
+                    retryable=False,
+                    local=True,
+                )
+                return False
+            return True
+
+    def _pending_attempt(self, conn, identifier, attempt_id):
+        self._require_owner(identifier)
+        attempt = next(
+            (a for a in review_attempts(self._read(conn, identifier)) if a.id == attempt_id), None
+        )
+        if attempt is None or attempt.state != "started":
+            raise ValueError("Attempt is not pending")
+        return attempt
+
+    def _failed_attempt(
+        self,
+        conn,
+        row,
+        checkpoint,
+        attempt,
+        *,
+        kind,
+        retryable,
+        usage=None,
+        local=False,
+        unknown=False,
+    ):
+        current = self._read(conn, row["id"])
+        step = self._step(conn, row["id"], attempt.key)
+        snapshot_id = UUID(step.request.inputs["operation"]["snapshot_id"])
+        policy = saved_policy(current, snapshot_id)
+        now = self._now(conn)
+        charged = (
+            usage.input_tokens + usage.output_tokens
+            if usage is not None
+            else 0
+            if local
+            else step.request.reserved_tokens
+        )
+        delay = min(
+            policy.max_retry_delay_seconds,
+            policy.retry_delay_seconds * 2 ** min(attempt.number - 1, 20),
+        )
+        ended = attempt.model_copy(
+            update={
+                "state": "unknown" if unknown else "failed",
+                "finished_at": now,
+                "usage": usage,
+                "charged_tokens": charged,
+                "charge_basis": "reported"
+                if usage is not None
+                else "not_called"
+                if local
+                else "reservation",
+                "error_kind": kind,
+                "retryable": retryable,
+                "retry_at": now + timedelta(seconds=delay) if retryable else None,
+                "estimated_usd": attempt.prices.cost(usage) if attempt.prices and usage else None,
+            }
+        )
+        budget = checkpoint.budget.model_copy(
+            update={"review_spent": checkpoint.budget.review_spent + charged}
+        )
+        updated = checkpoint.model_copy(update={"budget": budget})
+        if checkpoint.phase in ACTIVE:
+            updated = transition(updated, Phase.PAUSED if retryable else Phase.PARKED, reason=kind)
+        return self._save(
+            conn,
+            row,
+            updated,
+            "review_attempt_unknown" if unknown else "review_attempt_failed",
+            {"review_attempt": ended.model_dump(mode="json")},
+        )
+
+    def fail_answer_attempt(self, identifier, attempt_id, error):
+        with self.engine.begin() as conn:
+            row, checkpoint = self._lock(conn, identifier)
+            attempt = self._pending_attempt(conn, identifier, attempt_id)
+            return self._failed_attempt(
+                conn,
+                row,
+                checkpoint,
+                attempt,
+                kind=error.kind,
+                retryable=error.retryable,
+                usage=error.usage,
+                local=error.kind == "context_limit",
+            )
+
+    def reconcile_answer_attempt(self, identifier):
+        with self.engine.begin() as conn:
+            row, checkpoint = self._lock(conn, identifier)
+            attempt = next(
+                a for a in review_attempts(self._read(conn, identifier)) if a.state == "started"
+            )
+            self._require_owner(identifier)
+            return self._failed_attempt(
+                conn,
+                row,
+                checkpoint,
+                attempt,
+                kind="remote_outcome_unknown",
+                retryable=False,
+                unknown=True,
+            )
 
     def revise_brief(self, identifier: UUID, expected_revision: int, brief: Brief) -> Investigation:
         with self.engine.begin() as conn:
@@ -213,6 +507,13 @@ class InvestigationStore:
             row, current = self._lock(conn, identifier, expected_revision)
             if current.phase not in {Phase.PAUSED, Phase.PARKED, Phase.STOPPED_AT_LIMIT}:
                 raise ValueError("Only paused, parked, or limit-stopped work can resume")
+            attempts = review_attempts(self._read(conn, identifier))
+            if (
+                attempts
+                and attempts[-1].retry_at is not None
+                and attempts[-1].retry_at > self._now(conn)
+            ):
+                raise ValueError("Retry is not due yet")
             target = current.resume_phase
             if target not in ACTIVE:
                 raise ValueError("No resumable phase was recorded")
@@ -229,6 +530,10 @@ class InvestigationStore:
             row, current = self._lock(conn, identifier, expected_revision)
             if current.phase in {Phase.COMPLETE, Phase.CANCELED}:
                 raise ValueError("Cannot grant a terminal investigation")
+            history = self._read(conn, identifier)
+            ceiling = history.events[0].details.get("lifetime_tokens", current.budget.limits.total)
+            requested_limits = limits
+            limits = limits.model_copy(update={"total": min(limits.total, ceiling)})
             old = current.budget.limits
             if any(
                 getattr(limits, key) < getattr(old, key) for key in ("research", "review", "total")
@@ -250,6 +555,8 @@ class InvestigationStore:
                 {
                     "before": old.model_dump(),
                     "after": limits.model_dump(),
+                    "requested": requested_limits.model_dump(),
+                    "lifetime_tokens": ceiling,
                 },
             )
 
@@ -328,6 +635,8 @@ class InvestigationStore:
         expected_revision: int,
         key: str,
         result: StepResult,
+        *,
+        attempt_id: UUID | None = None,
     ) -> Investigation:
         with self.engine.begin() as conn:
             row, current = self._lock(conn, identifier, expected_revision)
@@ -338,7 +647,27 @@ class InvestigationStore:
                 if step.result != result:
                     raise ValueError("A committed result cannot be replaced")
                 return self._read(conn, identifier)
+            ended_attempt = None
             if step.request.kind == KIND:
+                history = review_attempts(self._read(conn, identifier))
+                pending = next((a for a in history if a.state == "started" and a.key == key), None)
+                if pending is not None and attempt_id != pending.id:
+                    raise ValueError("Owned pending attempt is required to commit this result")
+                if attempt_id is not None:
+                    attempt = self._pending_attempt(conn, identifier, attempt_id)
+                    if attempt.key != key:
+                        raise ValueError("Attempt belongs to a different operation")
+                    usage = CALL.validate_python(result.output["call"]).usage
+                    ended_attempt = attempt.model_copy(
+                        update={
+                            "state": "succeeded",
+                            "finished_at": self._now(conn),
+                            "usage": usage,
+                            "charged_tokens": result.used_tokens,
+                            "charge_basis": "reported",
+                            "estimated_usd": attempt.prices.cost(usage) if attempt.prices else None,
+                        }
+                    )
                 _, context, state = self._answer_state(conn, identifier)
                 operation = Operation.model_validate(step.request.inputs["operation"])
                 if operation != state.next_operation:
@@ -360,6 +689,8 @@ class InvestigationStore:
             checkpoint = current.model_copy(update={"budget": updated_budget})
             if updated_budget.remaining(step.request.lane) == 0 and current.phase in ACTIVE:
                 checkpoint = transition(checkpoint, Phase.STOPPED_AT_LIMIT, reason="budget")
+                if step.request.kind == KIND:
+                    checkpoint = checkpoint.model_copy(update={"resume_phase": Phase.REVIEWING})
             conn.execute(
                 update(db.steps)
                 .where(
@@ -377,6 +708,11 @@ class InvestigationStore:
                     "key": key,
                     "status": result.status.value,
                     "used_tokens": result.used_tokens,
+                    **(
+                        {"review_attempt": ended_attempt.model_dump(mode="json")}
+                        if ended_attempt
+                        else {}
+                    ),
                 },
             )
 

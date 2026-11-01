@@ -125,7 +125,7 @@ class ScriptedClients:
         self.calls.append(("write", identifier))
         return self.call("author", context, self.answer(context, identifier))
 
-    def revise(self, context, identifier, previous, review, *, rulings=()):
+    def revise(self, context, identifier, previous, review, *, rulings=(), closeout=False):
         self.calls.append(("revise", previous, review, rulings))
         return self.call(
             "author", context, self.answer(context, identifier, previous, review, rulings)
@@ -198,10 +198,14 @@ class ScriptedClients:
 
 @pytest.fixture
 def loop(database, review_corpus):
-    def make(case_id):
+    def make(case_id, *, lifetime_tokens=None):
         case = next(c for c in review_corpus.cases if c.id == case_id)
         store = InvestigationStore(database[0])
-        run = store.create(review_corpus.brief, Limits(research=100, review=2000000, total=2000100))
+        run = store.create(
+            review_corpus.brief,
+            Limits(research=100, review=2000000, total=2000100),
+            lifetime_tokens=lifetime_tokens,
+        )
         observation = store.ingest_text(
             run.id,
             run.revision,
@@ -234,7 +238,7 @@ def advance(store, identifier, clients, count=1):
     state = None
     for _ in range(count):
         # A new controller/store instance on every operation exercises reconstruction.
-        fresh = InvestigationStore(store.engine)
+        fresh = InvestigationStore(store.engine, clock=store.clock)
         state = AnswerController(fresh, clients).advance(
             identifier, fresh.load(identifier).revision
         )
@@ -382,18 +386,24 @@ def test_plan_is_saved_before_io_and_pending_intent_reused_after_failure(loop):
     observed = []
     clients.before_call = lambda: observed.append(store.load(identifier).steps[-1])
     clients.fail = True
-    with pytest.raises(RoleCallError):
-        advance(store, identifier, clients)
+    paused = advance(store, identifier, clients)
+    assert paused.lifecycle_phase == Phase.PAUSED
     assert observed[0].result is None
     pending = store.load(identifier).steps[-1]
     assert pending.request.inputs["execution"]["prompt_version"] == PROMPT_VERSIONS["author"]
     assert "api_key" not in str(pending.request.inputs)
     clients.fail = False
+    retry_at = store.export(identifier).review_attempts[-1].retry_at
+    store.clock = lambda: retry_at
+    store.resume(identifier, store.load(identifier).revision)
     state = advance(store, identifier, clients)
     assert len(store.load(identifier).steps) == 1
     assert state.next_operation.action == "review"
     assert observed[1].request == pending.request
-    assert store.load(identifier).checkpoint.budget.review_spent == 15
+    assert (
+        store.load(identifier).checkpoint.budget.review_spent
+        == pending.request.reserved_tokens + 15
+    )
     with pytest.raises(ValueError, match="committed result"):
         store.finish_step(
             identifier,
@@ -413,8 +423,8 @@ def test_stale_held_and_unaffordable_runs_do_no_paid_work(loop):
         advance(store, identifier, clients)
     store.resume(identifier, held.revision)
     clients.limits = clients.limits.model_copy(update={"max_prompt_bytes": 3000000})
-    with pytest.raises(ValueError, match="allowance"):
-        advance(store, identifier, clients)
+    held = advance(store, identifier, clients)
+    assert held.lifecycle_phase == Phase.PARKED
     assert clients.calls == []
     assert store.load(identifier).steps == ()
 
@@ -581,8 +591,10 @@ def test_cli_executes_one_action_with_explicit_models_and_limits(
 def test_pending_execution_cannot_silently_change_model_or_call_bounds(loop):
     store, identifier, clients, _ = loop("review-pending-revision")
     clients.fail = True
-    with pytest.raises(RoleCallError):
-        advance(store, identifier, clients)
+    advance(store, identifier, clients)
+    retry_at = store.export(identifier).review_attempts[-1].retry_at
+    store.clock = lambda: retry_at
+    store.resume(identifier, store.load(identifier).revision)
     clients.fail = False
     clients.limits = clients.limits.model_copy(update={"max_output_tokens": 512})
     with pytest.raises(ValueError, match="different work"):

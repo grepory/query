@@ -887,3 +887,28 @@ def test_adjudication_retains_prior_defense_review_provenance(context):
             wrong,
             response_review=old_review,
         )
+
+
+def test_structured_schema_and_provider_framing_are_inside_input_admission_bound(context):
+    from query.review_clients import PROMPTS
+
+    payload = {
+        "context": context.payload(),
+        "answer_id": str(UUID(int=1)),
+        "task": "write initial answer",
+    }
+    prompt_bytes = len(
+        (PROMPTS["author"] + json.dumps(payload, ensure_ascii=False, sort_keys=True)).encode()
+    )
+    schema_bytes = len(json.dumps(Answer.model_json_schema(), ensure_ascii=False).encode())
+    cap = prompt_bytes + 2 * schema_bytes + 8192 - 1
+    captured = []
+    clients = ReviewClients(
+        config(),
+        limits=CallLimits(max_prompt_bytes=cap),
+        author_model=function(answer_data(context), captured),
+    )
+    with pytest.raises(RoleCallError) as exc:
+        clients.write(context, UUID(int=1))
+    assert exc.value.kind == "context_limit"
+    assert exc.value.usage is None and captured == []
