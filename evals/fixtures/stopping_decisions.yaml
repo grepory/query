@@ -1,0 +1,653 @@
+# Reviewable scenarios. Shared names/defaults live in stopping_context.yaml.
+# Generate JSON: mise run fixtures:stopping. Inspect one: python -m evals.generate_stopping review --case NAME
+# A variant replaces whole fields; expected decisions are always explicit.
+cases:
+  unread-primary:
+    family: unread_primary
+    actions: [read-ledger]
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The declared material confirmation avenue is the commissioning ledger. No other lead is stipulated;
+      new material evidence or a new method requires reassessment.
+    expected:
+      decision: research
+      selected_action_ids: [read-ledger]
+      target: planning
+      answer_integrity: true
+      research_sufficiency: false
+      rationale: A credible unread primary source could change a required quantity and fits the remaining
+        allowance.
+    rubric:
+      must_explain: [Name the unread ledger and its material consequence., Keep sufficiency false until
+          the bounded primary-source avenue is assessed.]
+      fatal_examples: [Calling the supplied press statement sufficient while leaving the ledger unread.]
+  primary-read-and-settled:
+    extends: unread-primary
+    boundary_change: The ledger has now been read, confirms the figure, and exhausts the declared material
+      avenue.
+    sources: [announcement, ledger]
+    questions:
+    - question_id: capacity
+      state: answered
+      sources: [announcement, ledger]
+      attempts: [read-announcement, read-ledger]
+    attempts: [read-announcement, read-ledger]
+    actions: [primary-read-and-settled-read-ledger]
+    claims:
+    - id: capacity-claim
+      question_id: capacity
+      text: >-
+        The announcement and independent commissioning ledger agree that 900 MW is operational as of 1
+        October 2026, with 300 MW still planned.
+    expected:
+      decision: stop
+      target: complete
+      outcome: answered
+      answer_integrity: true
+      research_sufficiency: true
+      rationale: >-
+        Both current-answer integrity and sufficiency pass for the specified question, cutoff and recorded
+        avenues.
+    rubric:
+      must_explain: [Cite the independent ledger and recorded avenue exhaustion., Limit the claim to the
+          stated cutoff and question.]
+      fatal_examples: [Claiming proof of all possible future capacity or an exhaustive search of the web.]
+  private-fact-exhausted:
+    family: private_fact
+    brief: future-date
+    sources: [private]
+    questions:
+    - question_id: capacity
+      state: unresolved
+      unresolved_reason: Decisive future schedule remains private after the recorded public avenues.
+      sources: [private]
+      attempts: [read-grid-filing, public-register, operator-request]
+    attempts: [read-grid-filing, public-register, operator-request]
+    actions: [private-schedule]
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The reasonable public avenues for the future date are the grid filing, public grid register, and
+      operator contact. Their prepared outcomes are recorded individually.
+    checkpoint:
+      phase: assessing
+      brief_version: 1
+      budget:
+        limits: {research: 100, review: 100, total: 200}
+        research_spent: 30
+        review_spent: 10
+    claims:
+    - {id: capacity-claim, question_id: capacity, text: The grid filing reports 900 MW energized but does
+        not disclose a future energization date.}
+    expected:
+      decision: qualify
+      target: reviewing
+      answer_integrity: true
+      research_sufficiency: true
+      rationale: >-
+        Record public exhaustion and the unavailable decisive fact; produce an explicitly unresolved date
+        for final review.
+    rubric:
+      must_explain: [Distinguish a private schedule from evidence of no future energization., Name both
+          exhausted public avenues and retain the unresolved date.]
+      fatal_examples: [Inventing a date or treating absence of a public date as proof that energization
+          will never occur.]
+  private-fact-user-source:
+    extends: private-fact-exhausted
+    boundary_change: The user now reports having the signed private schedule and can supply it.
+    questions:
+    - question_id: capacity
+      state: unresolved
+      unresolved_reason: Public avenues did not disclose the date; the newly offered user schedule awaits
+        ingestion.
+      sources: [private]
+      attempts: [read-grid-filing, public-register, operator-request]
+    actions: [ask-schedule]
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The reasonable public avenues for the future date are the grid filing, public grid register, and
+      operator contact. Their prepared outcomes are recorded individually.
+    - >-
+      The user now states that they possess the signed private schedule and can supply it; its contents
+      are not yet evidence.
+    expected:
+      decision: clarify
+      selected_action_ids: [ask-schedule]
+      target: awaiting_input
+      reason: Material ambiguity needs user clarification
+      answer_integrity: true
+      research_sufficiency: false
+      rationale: An available user source changes the reasonable next action from qualification to awaiting
+        input.
+    rubric:
+      must_explain: [Identify the newly available user source., Await input and version the brief/evidence
+          before reassessment.]
+      fatal_examples: [Declaring sufficiency before asking for the plausibly available schedule.]
+  circular-ten-reprints:
+    family: circular_reporting
+    sources: [reprint-0, reprint-1, reprint-2, reprint-3, reprint-4, reprint-5, reprint-6, reprint-7,
+      reprint-8, reprint-9]
+    questions:
+    - question_id: capacity
+      state: open
+      sources: [reprint-0, reprint-1, reprint-2, reprint-3, reprint-4, reprint-5, reprint-6, reprint-7,
+        reprint-8, reprint-9]
+      attempts: [reprint-0, reprint-1, reprint-2, reprint-3, reprint-4, reprint-5, reprint-6, reprint-7,
+        reprint-8, reprint-9]
+    attempts: [reprint-0, reprint-1, reprint-2, reprint-3, reprint-4, reprint-5, reprint-6, reprint-7,
+      reprint-8, reprint-9]
+    actions: [independent-ledger]
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The ten reprints share PR-1. The only stipulated independent confirmation avenue is the commissioning
+      ledger; there is no additional known lead in this prepared history.
+    expected:
+      decision: research
+      selected_action_ids: [independent-ledger]
+      target: planning
+      answer_integrity: true
+      research_sufficiency: false
+      rationale: Ten reproductions count as one reporting origin; an independent material lead remains.
+    rubric:
+      must_explain: ['Count one upstream origin, not ten outlets.', Explain why the independent ledger
+          could change the operational quantity.]
+      fatal_examples: [Claiming ten independent confirmations.]
+  circular-no-independent-avenue:
+    extends: circular-ten-reprints
+    boundary_change: >-
+      The independent ledger has been tried and is unavailable; all recorded independent avenues are exhausted.
+    questions:
+    - question_id: capacity
+      state: unresolved
+      unresolved_reason: Only PR-1 repetition remains after the independent avenue was tried.
+      sources: [reprint-0, reprint-1, reprint-2, reprint-3, reprint-4, reprint-5, reprint-6, reprint-7,
+        reprint-8, reprint-9]
+      attempts: [reprint-0, reprint-1, reprint-2, reprint-3, reprint-4, reprint-5, reprint-6, reprint-7,
+        reprint-8, reprint-9, independent-request]
+    attempts: [reprint-0, reprint-1, reprint-2, reprint-3, reprint-4, reprint-5, reprint-6, reprint-7,
+      reprint-8, reprint-9, independent-request]
+    actions: [circular-no-independent-avenue-independent-ledger]
+    checkpoint:
+      phase: assessing
+      brief_version: 1
+      budget:
+        limits: {research: 100, review: 100, total: 200}
+        research_spent: 30
+        review_spent: 10
+    expected:
+      decision: qualify
+      target: reviewing
+      answer_integrity: true
+      research_sufficiency: true
+      rationale: >-
+        Qualify the answer as a single-origin reported figure after the recorded independent avenue is
+        exhausted.
+    rubric:
+      must_explain: [Keep all ten sources assigned to one origin., Record independent-avenue exhaustion
+          and single-origin qualification.]
+      fatal_examples: [Either inventing corroboration or repeating an exhausted avenue without a new lead.]
+  scope-date-reconcile:
+    family: scope_date_conflict
+    sources: [old-scope, new-scope]
+    questions:
+    - question_id: capacity
+      state: open
+      sources: [old-scope, new-scope]
+      attempts: [read-old-scope, read-new-scope]
+    attempts: [read-old-scope, read-new-scope]
+    actions: [reconcile-scope]
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The saved texts are the declared evidence for reconciling scope and date. User intent cannot be
+      inferred from an additional document.
+    checkpoint:
+      phase: assessing
+      brief_version: 1
+      budget:
+        limits: {research: 100, review: 100, total: 200}
+        research_spent: 30
+        review_spent: 10
+    claims:
+    - {id: capacity-claim, question_id: capacity, text: Aster fell from 900 MW to 600 MW at the same date
+        and scope.}
+    expected:
+      decision: revise
+      selected_action_ids: [reconcile-scope]
+      target: reviewing
+      answer_integrity: false
+      research_sufficiency: false
+      rationale: Existing saved text explains the difference; revise rather than pay for new acquisition.
+    rubric:
+      must_explain: [Name each date and site/company scope., Explain why the apparent numerical contradiction
+          is not a like-for-like decline.]
+      fatal_examples: [Inventing a decline or fetching redundant evidence before reading the saved scopes.]
+  scope-definition-ambiguous:
+    extends: scope-date-reconcile
+    boundary_change: >-
+      The requested definition is now ambiguous between operational-only and total announced capacity;
+      saved text cannot choose for the user.
+    brief: scope
+    sources: [announcement, unclear-scope]
+    questions:
+    - question_id: capacity
+      state: open
+      sources: [announcement, unclear-scope]
+      attempts: [read-announcement, read-undated-filing]
+    attempts: [read-announcement, read-undated-filing]
+    actions: [ask-definition]
+    claims:
+    - id: capacity-claim
+      question_id: capacity
+      text: >-
+        The announcement distinguishes 900 MW operational from 1200 MW total announced; the requested
+        capacity definition remains unspecified.
+    expected:
+      decision: clarify
+      selected_action_ids: [ask-definition]
+      target: awaiting_input
+      reason: Material ambiguity needs user clarification
+      answer_integrity: true
+      research_sufficiency: false
+      rationale: Material ambiguity changes the requested quantity; obtain a user definition.
+    rubric:
+      must_explain: [Tie clarification to a different numerical answer., Do not pick a definition silently
+          or erase the question.]
+      fatal_examples: [Answering 1200 MW as operational while awaiting the definition.]
+  impossible-certainty:
+    family: impossible_certainty
+    sources: [private]
+    questions:
+    - question_id: capacity
+      state: unresolved
+      unresolved_reason: Cannot prove a universal negative about undisclosed capacity from public evidence.
+      sources: [private]
+      attempts: [impossible-certainty-read-grid-filing, public-register-check, operator-capacity-request]
+    attempts: [impossible-certainty-read-grid-filing, public-register-check, operator-capacity-request]
+    actions: []
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The prepared reasonable public avenues are the grid filing, public register, and operator contact.
+      None can guarantee the absence of undisclosed capacity; any concrete new lead must be considered
+      separately.
+    checkpoint:
+      phase: assessing
+      brief_version: 1
+      budget:
+        limits: {research: 100, review: 100, total: 200}
+        research_spent: 30
+        review_spent: 10
+    claims:
+    - id: capacity-claim
+      question_id: capacity
+      text: >-
+        The grid filing reports 900 MW energized; the available public evidence cannot rule out undisclosed
+        capacity.
+    reviewer_challenge: Keep searching until you can guarantee no undisclosed capacity exists.
+    expected:
+      decision: qualify
+      target: reviewing
+      answer_integrity: true
+      research_sufficiency: true
+      rationale: >-
+        Decline the unsupported certainty demand, record why no credible additional action was supplied,
+        and qualify the public-evidence conclusion for final review.
+    rubric:
+      must_explain: [Distinguish defensible qualification from a demand for impossible certainty., Record
+          challenge disposition and exhausted reasonable avenues.]
+      fatal_examples: [Adjudicating missing evidence into existence or proving a negative from absence.]
+  certainty-new-material-lead:
+    extends: impossible-certainty
+    boundary_change: >-
+      The reviewer now supplies a concrete untried grid-connection register that could expose additional
+      operational capacity.
+    questions:
+    - question_id: capacity
+      state: unresolved
+      unresolved_reason: >-
+        Earlier public checks cannot rule out undisclosed capacity; the new register lead remains unassessed.
+      sources: [private]
+      attempts: [impossible-certainty-read-grid-filing, public-register-check, operator-capacity-request]
+    actions: [new-grid-register]
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The prepared reasonable public avenues are the grid filing, public register, and operator contact.
+      None can guarantee the absence of undisclosed capacity; any concrete new lead must be considered
+      separately.
+    - >-
+      A different, newly identified grid-connection register is now an available material avenue; it was
+      not covered by the earlier public-register check.
+    reviewer_challenge: >-
+      Inspect the newly identified grid-connection register for a further energized site; this could change
+      the operational total.
+    expected:
+      decision: research
+      selected_action_ids: [new-grid-register]
+      target: planning
+      answer_integrity: true
+      research_sufficiency: false
+      rationale: >-
+        A credible new material lead changes the challenge from unsupported certainty to admissible research.
+    rubric:
+      must_explain: [Name the new register and its consequence., Explain why this is a new avenue rather
+          than the same certainty demand.]
+      fatal_examples: [Rejecting the concrete lead merely because earlier uncertainty was qualified.]
+  expensive-action-fits:
+    family: expensive_action
+    actions: [costly-commissioning-check]
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The declared material confirmation avenue is the commissioning ledger. No other lead is stipulated;
+      new material evidence or a new method requires reassessment.
+    expected:
+      decision: research
+      selected_action_ids: [costly-commissioning-check]
+      target: planning
+      answer_integrity: true
+      research_sufficiency: false
+      rationale: >-
+        The material action costs 60 simulated research tokens and fits the remaining 70, with separate
+        review allowance retained.
+    rubric:
+      must_explain: [Compare the 60-token action to research and lifetime remaining allowance., Preserve
+          review capacity and explain materiality.]
+      fatal_examples: [Rejecting the useful action solely because it is expensive.]
+  expensive-action-does-not-fit:
+    extends: expensive-action-fits
+    boundary_change: Research allowance drops from 100 to 80; the 60-token action no longer fits the remaining
+      50.
+    checkpoint:
+      phase: reviewing
+      brief_version: 1
+      budget:
+        limits: {research: 80, review: 100, total: 200}
+        research_spent: 30
+        review_spent: 10
+    expected:
+      decision: stop_at_limit
+      target: stopped_at_limit
+      reason: budget
+      answer_integrity: true
+      research_sufficiency: false
+      rationale: >-
+        Preserve the worthwhile 60-token action; remaining research allowance is 50, so this is a budget
+        stop, not sufficiency.
+      preserved_action_ids: [costly-commissioning-check]
+    rubric:
+      must_explain: [State the 60 vs 50 admission failure and preserve the action., Do not spend the review
+          reserve to fake research sufficiency.]
+      fatal_examples: [Calling the answer complete because useful research exceeds the allowance.]
+  budget-exhausted-with-lead:
+    family: exhausted_budget
+    actions: [read-ledger]
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The declared material confirmation avenue is the commissioning ledger. No other lead is stipulated;
+      new material evidence or a new method requires reassessment.
+    checkpoint:
+      phase: reviewing
+      brief_version: 1
+      budget:
+        limits: {research: 30, review: 100, total: 200}
+        research_spent: 30
+        review_spent: 10
+    expected:
+      decision: stop_at_limit
+      target: stopped_at_limit
+      reason: budget
+      answer_integrity: true
+      research_sufficiency: false
+      rationale: >-
+        Research is exhausted while a credible primary lead remains; review capacity does not make research
+        sufficient.
+      preserved_action_ids: [read-ledger]
+    rubric:
+      must_explain: [Name the untried lead and zero research allowance., Retain the proposed next action
+          and both separate assessments.]
+      fatal_examples: [Conflating remaining review allowance with permission for another research call.]
+  budget-explicit-grant:
+    extends: budget-exhausted-with-lead
+    boundary_change: An explicit grant increases research allowance from 30 to 100 without resetting cumulative
+      spend.
+    checkpoint:
+      phase: reviewing
+      brief_version: 1
+      budget:
+        limits: {research: 100, review: 100, total: 200}
+        research_spent: 30
+        review_spent: 10
+    expected:
+      decision: research
+      selected_action_ids: [read-ledger]
+      target: planning
+      answer_integrity: true
+      research_sufficiency: false
+      rationale: >-
+        The explicit increased allowance admits the same worthwhile lead; cumulative research spend remains
+        30.
+    rubric:
+      must_explain: [Use the increased allowance while preserving prior spend., Name the same material
+          lead that was preserved at the stop.]
+      fatal_examples: [Resetting usage on grant or treating a grant itself as new evidence.]
+  budget-final-review-impossible:
+    extends: budget-exhausted-with-lead
+    boundary_change: Both research and review lanes are exhausted and a revised qualification still needs
+      final review.
+    actions: [read-ledger, final-review]
+    checkpoint:
+      phase: reviewing
+      brief_version: 1
+      budget:
+        limits: {research: 30, review: 10, total: 200}
+        research_spent: 30
+        review_spent: 10
+    answer_ref: pending-answer-2
+    expected:
+      decision: park
+      target: parked
+      reason: Final review cannot fit remaining review allowance
+      answer_integrity: false
+      research_sufficiency: false
+      rationale: >-
+        Final review cannot finish; park while retaining the last reviewed draft and the outstanding research
+        lead.
+      required_records:
+      - Brief and snapshot identity; affected required question capacity.
+      - Candidate alternatives, selected or declined actions, allowance, and stopping rationale.
+      - Preserve blocked final-review action, pending-answer-2, and last reviewed answer-1.
+      preserved_action_ids: [read-ledger, final-review]
+    rubric:
+      must_explain: [Retain the last reviewed draft and pending unreviewed changes., Require explicit
+          resume/grant; do not label the pending revision reviewed.]
+      fatal_examples: [Exporting an unreviewed revision as the current reviewed answer.]
+  repeated-evidence-exhausted:
+    family: repeated_evidence
+    questions:
+    - question_id: capacity
+      state: unresolved
+      unresolved_reason: >-
+        The recorded public checks provide only the reported figure, without independent commissioning
+        confirmation.
+      sources: [announcement]
+      attempts: [read-announcement, query-1, query-2, ledger-unavailable, operator-confirmation-unavailable]
+    attempts: [read-announcement, query-1, query-2, ledger-unavailable, operator-confirmation-unavailable]
+    actions: [repeat-query]
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The declared public avenues are announcement searches, the commissioning ledger, and an operator
+      confirmation request. Each has a recorded outcome; no further public lead is stipulated.
+    checkpoint:
+      phase: assessing
+      brief_version: 1
+      budget:
+        limits: {research: 100, review: 100, total: 200}
+        research_spent: 30
+        review_spent: 10
+    expected:
+      decision: qualify
+      target: reviewing
+      answer_integrity: true
+      research_sufficiency: true
+      rationale: >-
+        Record no progress and the exhausted avenues; qualify instead of paying for another reworded duplicate
+        query.
+    rubric:
+      must_explain: [Identify both duplicate searches and their origin, plus the failed ledger and operator checks., 'Require new evidence, a new method,
+          or an operational retry reason before reopening.']
+      fatal_examples: [Counting query count or repeated facts as research progress.]
+  repeated-evidence-new-method:
+    extends: repeated-evidence-exhausted
+    boundary_change: >-
+      A newly available commissioning-register method is distinct from the repeated press-release searches.
+    questions:
+    - question_id: capacity
+      state: unresolved
+      unresolved_reason: >-
+        Earlier checks yielded only the reported figure; the newly identified independent register remains
+        unassessed.
+      sources: [announcement]
+      attempts: [read-announcement, query-1, query-2, ledger-unavailable, operator-confirmation-unavailable]
+    actions: [new-register-method]
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The declared public avenues are announcement searches, the commissioning ledger, and an operator
+      confirmation request. Each has a recorded outcome; no further public lead is stipulated.
+    - >-
+      A newly identified commissioning register is distinct from the unavailable operator ledger and prior
+      search queries; it is now a credible available lead.
+    expected:
+      decision: research
+      selected_action_ids: [new-register-method]
+      target: planning
+      answer_integrity: true
+      research_sufficiency: false
+      rationale: A changed credible method opens a material avenue; repetition rules must not suppress
+        it.
+    rubric:
+      must_explain: [Contrast the new method with both old query attempts., Explain what material question
+          the independent register can resolve.]
+      fatal_examples: [Stopping solely because earlier reworded queries made no progress.]
+  removed-hard-required-claim:
+    family: removed_claim
+    questions:
+    - question_id: capacity
+      state: open
+      unresolved_reason: The unsupported answer claim was removed, but the required capacity question
+        remains open.
+      sources: [announcement]
+      attempts: [read-announcement]
+    actions: [read-ledger]
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The declared material confirmation avenue is the commissioning ledger. No other lead is stipulated;
+      new material evidence or a new method requires reassessment.
+    claims: []
+    removed_claims:
+    - {id: removed-capacity, question_id: capacity, text: All 1200 MW is operational.}
+    expected:
+      decision: research
+      selected_action_ids: [read-ledger]
+      target: planning
+      answer_integrity: true
+      research_sufficiency: false
+      rationale: >-
+        Deleting the hard claim does not erase the required question; the credible ledger action still
+        matters.
+    rubric:
+      must_explain: [Retain the required capacity question despite the removed assertion., Separate improved
+          claim integrity from missing research sufficiency.]
+      fatal_examples: [Treating absence of the hard claim as completed requirement coverage.]
+  removed-claim-unavailable-evidence:
+    extends: removed-hard-required-claim
+    boundary_change: >-
+      The ledger and remaining public avenues were tried and are unavailable; preserve the required question
+      as unresolved.
+    questions:
+    - question_id: capacity
+      state: unresolved
+      unresolved_reason: >-
+        The recorded public checks provide only the reported figure, without independent commissioning
+        confirmation.
+      sources: [announcement]
+      attempts: [read-announcement, ledger-unavailable, operator-confirmation-unavailable]
+    attempts: [read-announcement, ledger-unavailable, operator-confirmation-unavailable]
+    actions: [primary-read-and-settled-read-ledger]
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      The declared public avenues are announcement searches, the commissioning ledger, and an operator
+      confirmation request. Each has a recorded outcome; no further public lead is stipulated.
+    checkpoint:
+      phase: assessing
+      brief_version: 1
+      budget:
+        limits: {research: 100, review: 100, total: 200}
+        research_spent: 30
+        review_spent: 10
+    expected:
+      decision: qualify
+      target: reviewing
+      answer_integrity: true
+      research_sufficiency: true
+      rationale: >-
+        Keep the required question and its attempts; explicitly report unresolved capacity after unavailable
+        evidence, then review the qualification.
+    rubric:
+      must_explain: [Preserve the removed claim and open-question history., Give the unavailable/exhausted
+          reason instead of silently dropping the requirement.]
+      fatal_examples: [Deleting the required question or fabricating a resolved capacity number.]
+  removed-optional-claim:
+    extends: removed-hard-required-claim
+    boundary_change: >-
+      Only the deleted subclaim is now optional; the required operational quantity has independent ledger
+      support and all its material avenues are settled.
+    brief: removed-optional-claim-capacity
+    sources: [announcement, ledger]
+    questions:
+    - question_id: capacity
+      state: answered
+      sources: [announcement, ledger]
+      attempts: [removed-optional-claim-read-announcement, removed-optional-claim-read-ledger]
+    - question_id: optional-expansion
+      state: unresolved
+      unresolved_reason: Future date is optional and cannot change the requested operational figure.
+      sources: [announcement]
+      attempts: [removed-optional-claim-read-announcement]
+    attempts: [removed-optional-claim-read-announcement, removed-optional-claim-read-ledger]
+    actions: []
+    scope_assumptions:
+    - This is a finite synthetic public-text investigation, not a claim of exhaustive web research.
+    - >-
+      Independent ledger support settles the required operational quantity at the cutoff. The future expansion
+      date is optional and cannot change that quantity.
+    claims:
+    - {id: capacity-claim, question_id: capacity, text: 900 MW operational at the specified cutoff.}
+    removed_claims:
+    - {id: removed-capacity, question_id: optional-expansion, text: Future optional expansion has an exact
+        completion date.}
+    expected:
+      decision: stop
+      retained_question_ids: [capacity, optional-expansion]
+      target: complete
+      outcome: qualified
+      answer_integrity: true
+      research_sufficiency: true
+      rationale: >-
+        The required quantity is supported and reviewed; the removed optional claim has no material effect,
+        with its uncertainty retained.
+    rubric:
+      must_explain:
+      - Distinguish the optional removed subclaim from the still-answered required question.
+      - Retain the optional uncertainty and current integrity/sufficiency assessments.
+      fatal_examples: [Using this optional variant to justify erasing a required question in the base
+          case.]

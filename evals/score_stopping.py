@@ -1,4 +1,4 @@
-"""Offline aggregation of attributed human judgments; never calls a model."""
+"""Offline aggregation of human/model judgments under a human-approved rubric."""
 
 import argparse
 import hashlib
@@ -41,9 +41,25 @@ class Proposal(Contract):
     rationale: Text
 
 
-class HumanJudgment(Contract):
+class HumanReviewer(Contract):
+    kind: Literal["human"]
+    name: Text
+
+
+class ModelReviewer(Contract):
+    kind: Literal["model"]
+    name: Text
+    model: Text
+    prompt_version: Text
+
+
+Reviewer = Annotated[HumanReviewer | ModelReviewer, Field(discriminator="kind")]
+
+
+class Judgment(Contract):
     case_id: Text
-    reviewer: Text
+    reviewer: Reviewer
+    status: Literal["assessed", "needs_human_review"] = "assessed"
     proposal_digest: Text
     case_digest: Text
     rubric_digest: Text
@@ -57,7 +73,7 @@ class HumanJudgment(Contract):
 
 
 class RubricApproval(Contract):
-    reviewer: Text
+    reviewer: HumanReviewer
     corpus_digest: Text
     approved: bool
     notes: Text
@@ -66,20 +82,20 @@ class RubricApproval(Contract):
 class ReviewBundle(Contract):
     rubric_approval: RubricApproval
     proposals: tuple[Proposal, ...] = Field(min_length=1)
-    judgments: tuple[HumanJudgment, ...] = Field(min_length=1)
+    judgments: tuple[Judgment, ...] = Field(min_length=1)
 
 
 def score(bundle: ReviewBundle, corpus: StoppingCorpus) -> dict:
     approval = bundle.rubric_approval
     if not approval.approved or approval.corpus_digest != digest(corpus):
         raise ValueError("Human rubric approval must cover the current corpus and rubric")
-    cases = {case.id: case for case in corpus.cases}
+    cases = {str(case.evaluation_id): case for case in corpus.cases}
     proposals = {proposal.case_id: proposal for proposal in bundle.proposals}
     judgments = {judgment.case_id: judgment for judgment in bundle.judgments}
     if len(proposals) != len(bundle.proposals) or len(judgments) != len(bundle.judgments):
-        raise ValueError("Duplicate proposal or human judgment for a case")
+        raise ValueError("Duplicate proposal or judgment for a case")
     if proposals.keys() != judgments.keys() or not proposals.keys() <= cases.keys():
-        raise ValueError("Every known proposal needs exactly one matching human judgment")
+        raise ValueError("Every known proposal needs exactly one matching judgment")
     rows = []
     for case_id, proposal in proposals.items():
         case, judgment = cases[case_id], judgments[case_id]
@@ -88,7 +104,7 @@ def score(bundle: ReviewBundle, corpus: StoppingCorpus) -> dict:
             or judgment.case_digest != digest(case)
             or judgment.rubric_digest != digest(corpus.rubric_definition)
         ):
-            raise ValueError("Human judgment is stale for the proposal, case, or scoring rubric")
+            raise ValueError("Judgment is stale for the proposal, case, or scoring rubric")
         expected = case.expected
         structural = {
             "scope": (
@@ -117,7 +133,7 @@ def score(bundle: ReviewBundle, corpus: StoppingCorpus) -> dict:
                 and proposal.research_sufficiency == expected.research_sufficiency
             ),
         }
-        human_scores = {
+        rationale_scores = {
             name: getattr(judgment, name)
             for name in (
                 "evidence_and_scope",
@@ -128,23 +144,26 @@ def score(bundle: ReviewBundle, corpus: StoppingCorpus) -> dict:
         rows.append(
             {
                 "case_id": case_id,
+                "case_name": case.id,
                 "model": proposal.model,
                 "prompt_version": proposal.prompt_version,
                 "structural_checks": structural,
-                "human_scores": human_scores,
+                "rationale_scores": rationale_scores,
                 "fatal_errors": judgment.fatal_errors,
-                "reviewer": judgment.reviewer,
+                "reviewer": judgment.reviewer.model_dump(),
+                "review_status": judgment.status,
                 "proposal_digest": judgment.proposal_digest,
                 "case_digest": judgment.case_digest,
                 "rubric_digest": judgment.rubric_digest,
-                "human_notes": {
+                "review_notes": {
                     "evidence": judgment.evidence_notes,
                     "coverage": judgment.coverage_notes,
                     "action": judgment.action_notes,
                 },
                 "passed": (
                     all(structural.values())
-                    and all(v == 2 for v in human_scores.values())
+                    and judgment.status == "assessed"
+                    and all(v == 2 for v in rationale_scores.values())
                     and not judgment.fatal_errors
                 ),
             }
@@ -153,7 +172,8 @@ def score(bundle: ReviewBundle, corpus: StoppingCorpus) -> dict:
     return {
         "rubric_version": corpus.rubric_version,
         "corpus_digest": digest(corpus),
-        "rubric_reviewer": approval.reviewer,
+        "rubric_reviewer": approval.reviewer.model_dump(),
+        "reviewer_kinds": sorted({j.reviewer.kind for j in bundle.judgments}),
         "results": rows,
         "missing_cases": missing,
         "passed": not missing and all(row["passed"] for row in rows),
@@ -164,6 +184,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("inputs", help="Print prepared model inputs with gold/rubric removed")
+    commands.add_parser("manifest", help="Print operator-only case mapping and review digests")
     score_parser = commands.add_parser("score", help="Aggregate already reviewed proposals")
     score_parser.add_argument("--input", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -174,7 +195,29 @@ def main(argv=None) -> int:
                 json.dumps(
                     {
                         "corpus_digest": digest(corpus),
-                        "cases": [c.model_input() for c in corpus.cases],
+                        "cases": [
+                            c.model_input()
+                            for c in sorted(corpus.cases, key=lambda c: str(c.evaluation_id))
+                        ],
+                    },
+                    indent=2,
+                )
+            )
+            return 0
+        if args.command == "manifest":
+            print(
+                json.dumps(
+                    {
+                        "corpus_digest": digest(corpus),
+                        "rubric_digest": digest(corpus.rubric_definition),
+                        "cases": [
+                            {
+                                "case_id": str(c.evaluation_id),
+                                "case_name": c.id,
+                                "case_digest": digest(c),
+                            }
+                            for c in corpus.cases
+                        ],
                     },
                     indent=2,
                 )

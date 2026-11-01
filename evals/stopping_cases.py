@@ -116,9 +116,11 @@ class RubricDefinition(Contract):
 
 class StoppingCase(Contract):
     id: Text
+    evaluation_id: UUID
     family: Family
     boundary_of: Text | None = None
     boundary_change: Text | None = None
+    scope_assumptions: tuple[Text, ...] = Field(min_length=1)
     brief: Brief
     checkpoint: Checkpoint
     snapshot: LoadedSnapshot
@@ -228,6 +230,10 @@ class StoppingCase(Contract):
         if any(c.question_id not in question_ids for c in (*self.claims, *self.removed_claims)):
             raise ValueError("Claim names an unknown question")
         expected = self.expected
+        if expected.answer_integrity and self.answer_ref != self.last_reviewed_answer_ref:
+            raise ValueError(
+                "Integrity must assess the current reviewed answer, not a pending draft"
+            )
         if not set(expected.selected_action_ids + expected.preserved_action_ids) <= actions:
             raise ValueError("Expected decision names an unknown action")
         if not {q.key for q in self.brief.questions if q.required} <= set(
@@ -278,7 +284,7 @@ class StoppingCase(Contract):
         return self
 
     def model_input(self) -> dict:
-        return self.model_dump(
+        result = self.model_dump(
             mode="json",
             exclude={
                 "expected",
@@ -286,8 +292,11 @@ class StoppingCase(Contract):
                 "boundary_of",
                 "boundary_change",
                 "family",
+                "id",
+                "evaluation_id",
             },
         )
+        return {"id": str(self.evaluation_id), **result}
 
 
 class StoppingCorpus(Contract):
@@ -304,6 +313,8 @@ class StoppingCorpus(Contract):
         cases = {c.id: c for c in self.cases}
         if len(cases) != len(self.cases):
             raise ValueError("Duplicate stopping case")
+        if len({c.evaluation_id for c in self.cases}) != len(self.cases):
+            raise ValueError("Duplicate evaluation identity")
         for case in self.cases:
             if (case.boundary_of is None) != (case.boundary_change is None):
                 raise ValueError("Boundary must identify its parent and changed fact")

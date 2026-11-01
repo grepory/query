@@ -6,7 +6,8 @@ import pytest
 from pydantic import ValidationError
 
 from evals.score_stopping import (
-    HumanJudgment,
+    Judgment,
+    ModelReviewer,
     Proposal,
     ReviewBundle,
     RubricApproval,
@@ -25,7 +26,7 @@ def bundle(cases=CORPUS.cases):
     for case in cases:
         expected = case.expected
         proposal = Proposal(
-            case_id=case.id,
+            case_id=str(case.evaluation_id),
             model="fake-test-model",
             prompt_version="test-v1",
             brief_version=case.checkpoint.brief_version,
@@ -43,9 +44,9 @@ def bundle(cases=CORPUS.cases):
         )
         proposals.append(proposal)
         judgments.append(
-            HumanJudgment(
-                case_id=case.id,
-                reviewer="Synthetic test reviewer (not human approval)",
+            Judgment(
+                case_id=str(case.evaluation_id),
+                reviewer={"kind": "human", "name": "Synthetic test reviewer (not human approval)"},
                 proposal_digest=digest(proposal),
                 case_digest=digest(case),
                 rubric_digest=digest(CORPUS.rubric_definition),
@@ -60,7 +61,7 @@ def bundle(cases=CORPUS.cases):
         )
     return ReviewBundle(
         rubric_approval=RubricApproval(
-            reviewer="Synthetic rubric reviewer (test only)",
+            reviewer={"kind": "human", "name": "Synthetic rubric reviewer (test only)"},
             corpus_digest=digest(CORPUS),
             approved=True,
             notes="This test does not confer human approval on the rubric.",
@@ -74,7 +75,7 @@ def test_complete_synthetic_review_passes_and_retains_audit_notes():
     result = score(bundle(), CORPUS)
     assert result["passed"] and not result["missing_cases"]
     assert len(result["results"]) == len(CORPUS.cases)
-    assert result["results"][0]["human_notes"]["evidence"]
+    assert result["results"][0]["review_notes"]["evidence"]
 
 
 def test_right_label_cannot_replace_rationale_quality_or_erase_fatal_errors():
@@ -180,7 +181,7 @@ def test_ratings_must_use_integer_anchors(value):
     data = bundle().judgments[0].model_dump()
     data["evidence_and_scope"] = value
     with pytest.raises(ValidationError):
-        HumanJudgment.model_validate(data)
+        Judgment.model_validate(data)
 
 
 def test_offline_cli_exports_blind_inputs_and_scores_files(tmp_path, capsys):
@@ -199,3 +200,144 @@ def test_offline_cli_exports_blind_inputs_and_scores_files(tmp_path, capsys):
     assert main(["score", "--input", str(path)]) == 2
     output = capsys.readouterr()
     assert not output.out and "Invalid JSON" in output.err
+
+
+def model_bundle():
+    original = bundle()
+    reviewer = ModelReviewer(
+        kind="model", name="Synthetic model judge", model="fake-judge-v1", prompt_version="judge-v1"
+    )
+    return original.model_copy(
+        update={
+            "judgments": tuple(
+                j.model_copy(update={"reviewer": reviewer}) for j in original.judgments
+            )
+        }
+    )
+
+
+def test_model_reviews_pass_under_human_rubric_approval_and_keep_attribution():
+    result = score(model_bundle(), CORPUS)
+    assert result["passed"]
+    assert result["rubric_reviewer"]["kind"] == "human"
+    assert result["reviewer_kinds"] == ["model"]
+    for row in result["results"]:
+        assert row["reviewer"] == {
+            "kind": "model",
+            "name": "Synthetic model judge",
+            "model": "fake-judge-v1",
+            "prompt_version": "judge-v1",
+        }
+        assert row["rationale_scores"]["evidence_and_scope"] == 2
+        assert "human_scores" not in row and "human_notes" not in row
+
+
+def test_mixed_reviewers_keep_per_case_identity():
+    original = bundle()
+    model_review = model_bundle().judgments[0]
+    mixed = original.model_copy(update={"judgments": (model_review, *original.judgments[1:])})
+    result = score(mixed, CORPUS)
+    assert result["passed"] and result["reviewer_kinds"] == ["human", "model"]
+    assert result["results"][0]["reviewer"]["kind"] == "model"
+    assert result["results"][1]["reviewer"]["kind"] == "human"
+
+
+@pytest.mark.parametrize(
+    "reviewer",
+    [
+        {"kind": "model", "name": "Judge"},
+        {"kind": "model", "name": "Judge", "model": "fake-model"},
+        {"kind": "model", "name": "Judge", "model": "", "prompt_version": "v1"},
+        {"kind": "human", "name": "Human", "model": "fake-model", "prompt_version": "v1"},
+        {"name": "Unspecified kind"},
+    ],
+)
+def test_review_identity_requires_kind_and_model_metadata(reviewer):
+    data = bundle().judgments[0].model_dump(mode="json")
+    data["reviewer"] = reviewer
+    with pytest.raises(ValidationError):
+        Judgment.model_validate(data)
+
+
+def test_model_cannot_approve_the_rubric():
+    data = model_bundle().model_dump(mode="json")
+    data["rubric_approval"]["reviewer"] = data["judgments"][0]["reviewer"]
+    with pytest.raises(ValidationError):
+        ReviewBundle.model_validate(data)
+
+
+@pytest.mark.parametrize("failure", ["fatal", "partial", "uncertain", "wrong_decision"])
+def test_model_review_cannot_bypass_failure_gates(failure):
+    original = model_bundle()
+    first = original.judgments[0]
+    proposals = original.proposals
+    if failure == "fatal":
+        first = first.model_copy(update={"fatal_errors": ("unsupported_sufficiency",)})
+    elif failure == "partial":
+        first = first.model_copy(update={"action_and_stop": 1})
+    elif failure == "uncertain":
+        first = first.model_copy(update={"status": "needs_human_review"})
+    else:
+        changed = proposals[0].model_copy(update={"decision": "stop"})
+        proposals = (changed, *proposals[1:])
+        first = first.model_copy(update={"proposal_digest": digest(changed)})
+    result = score(
+        original.model_copy(
+            update={
+                "judgments": (first, *original.judgments[1:]),
+                "proposals": proposals,
+            }
+        ),
+        CORPUS,
+    )
+    assert not result["passed"] and not result["results"][0]["passed"]
+
+
+def test_model_reviews_still_require_current_human_approval_and_exact_digests():
+    original = model_bundle()
+    for field in ("proposal_digest", "case_digest", "rubric_digest"):
+        first = original.judgments[0].model_copy(update={field: "stale"})
+        with pytest.raises(ValueError, match="stale"):
+            score(
+                original.model_copy(update={"judgments": (first, *original.judgments[1:])}), CORPUS
+            )
+    for changes in ({"approved": False}, {"corpus_digest": "stale"}):
+        with pytest.raises(ValueError, match="Human rubric approval"):
+            score(
+                original.model_copy(
+                    update={
+                        "rubric_approval": original.rubric_approval.model_copy(update=changes),
+                    }
+                ),
+                CORPUS,
+            )
+
+
+def test_descriptive_case_names_cannot_be_submitted_in_place_of_blind_ids():
+    original = bundle(CORPUS.cases[:1])
+    proposal = original.proposals[0].model_copy(update={"case_id": CORPUS.cases[0].id})
+    judgment = original.judgments[0].model_copy(
+        update={
+            "case_id": CORPUS.cases[0].id,
+            "proposal_digest": digest(proposal),
+        }
+    )
+    with pytest.raises(ValueError, match="Every known proposal"):
+        score(
+            original.model_copy(update={"proposals": (proposal,), "judgments": (judgment,)}), CORPUS
+        )
+
+
+def test_cli_manifest_is_separate_from_blind_inputs_and_model_bundles_round_trip(tmp_path, capsys):
+    assert main(["inputs"]) == 0
+    inputs = json.loads(capsys.readouterr().out)
+    assert main(["manifest"]) == 0
+    manifest = json.loads(capsys.readouterr().out)
+    assert {c["id"] for c in inputs["cases"]} == {c["case_id"] for c in manifest["cases"]}
+    assert all(c["case_name"] not in json.dumps(inputs) for c in manifest["cases"])
+    assert manifest["corpus_digest"] == inputs["corpus_digest"] == digest(CORPUS)
+    assert manifest["rubric_digest"] == digest(CORPUS.rubric_definition)
+    path = tmp_path / "model-reviews.json"
+    path.write_text(model_bundle().model_dump_json())
+    assert main(["score", "--input", str(path)]) == 0
+    assert json.loads(capsys.readouterr().out)["reviewer_kinds"] == ["model"]
